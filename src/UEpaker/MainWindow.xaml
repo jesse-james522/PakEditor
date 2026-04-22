@@ -158,16 +158,62 @@
                            Foreground="#AAA" FontSize="13"
                            HorizontalAlignment="Center" VerticalAlignment="Center"/>
 
-                <!-- JSON content -->
-                <TextBox Grid.Row="1" x:Name="TxtPreviewJson"
-                         IsReadOnly="True"
-                         FontFamily="Consolas" FontSize="12"
-                         HorizontalScrollBarVisibility="Auto"
-                         VerticalScrollBarVisibility="Auto"
-                         BorderThickness="0" Padding="8"
-                         TextWrapping="NoWrap"
-                         Visibility="Collapsed"
-                         Background="White"/>
+                <!-- Tabbed content view -->
+                <TabControl Grid.Row="1" x:Name="PreviewTabs" Visibility="Collapsed">
+
+                    <!-- Exports tab: export list + property tree side by side -->
+                    <TabItem Header="Exports">
+                        <Grid>
+                            <Grid.ColumnDefinitions>
+                                <ColumnDefinition Width="200" MinWidth="100"/>
+                                <ColumnDefinition Width="4"/>
+                                <ColumnDefinition Width="*"/>
+                            </Grid.ColumnDefinitions>
+
+                            <ListBox x:Name="ExportListBox" Grid.Column="0"
+                                     FontFamily="Consolas" FontSize="11"
+                                     SelectionChanged="ExportListBox_SelectionChanged"
+                                     DisplayMemberPath="Name"
+                                     ScrollViewer.HorizontalScrollBarVisibility="Auto"/>
+
+                            <GridSplitter Grid.Column="1" Width="4" HorizontalAlignment="Stretch"
+                                          Background="#DDDDDD"/>
+
+                            <!-- Property tree: Name | Type | Value columns -->
+                            <TreeView x:Name="PropertyTree" Grid.Column="2"
+                                      FontFamily="Consolas" FontSize="12"
+                                      VirtualizingStackPanel.IsVirtualizing="True"
+                                      VirtualizingStackPanel.VirtualizationMode="Recycling">
+                                <TreeView.ItemTemplate>
+                                    <HierarchicalDataTemplate DataType="{x:Type local:PropertyTreeNode}"
+                                                              ItemsSource="{Binding Children}">
+                                        <Grid>
+                                            <Grid.ColumnDefinitions>
+                                                <ColumnDefinition Width="240"/>
+                                                <ColumnDefinition Width="100"/>
+                                                <ColumnDefinition Width="*"/>
+                                            </Grid.ColumnDefinitions>
+                                            <TextBlock Grid.Column="0" Text="{Binding Label}"
+                                                       Foreground="#1A1A8C" Margin="0,0,8,0"/>
+                                            <TextBlock Grid.Column="1" Text="{Binding TypeName}"
+                                                       Foreground="#888" Margin="0,0,8,0"/>
+                                            <TextBlock Grid.Column="2" Text="{Binding DisplayValue}"
+                                                       Foreground="#1C4A1C" TextTrimming="CharacterEllipsis"/>
+                                        </Grid>
+                                    </HierarchicalDataTemplate>
+                                </TreeView.ItemTemplate>
+                            </TreeView>
+                        </Grid>
+                    </TabItem>
+
+                    <!-- Imports tab -->
+                    <TabItem Header="Imports">
+                        <ListBox x:Name="ImportListBox"
+                                 FontFamily="Consolas" FontSize="11"
+                                 ScrollViewer.HorizontalScrollBarVisibility="Auto"/>
+                    </TabItem>
+
+                </TabControl>
             </Grid>
         </Grid>
     </DockPanel>

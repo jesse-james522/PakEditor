@@ -2,9 +2,10 @@ using CUE4Parse.Compression;
 using CUE4Parse.Encryption.Aes;
 using CUE4Parse.FileProvider;
 using CUE4Parse.MappingsProvider;
+using CUE4Parse.UE4.Assets;
+using CUE4Parse.UE4.Assets.Exports;
 using CUE4Parse.UE4.Objects.Core.Misc;
 using CUE4Parse.UE4.Versions;
-using Newtonsoft.Json;
 
 namespace Viewer;
 
@@ -86,24 +87,31 @@ public class GameProvider : IDisposable
     }
 
     /// <summary>
-    /// Loads a package and returns its exports serialized as indented JSON.
-    /// The path should include the file extension as it appears in the tree (e.g. .uasset).
+    /// Loads a package and returns its exports.
+    /// The path should include the file extension as it appears in the tree.
     /// Returns null if the path is not a loadable package type.
     /// </summary>
-    public async Task<string?> LoadPackageJsonAsync(string virtualPath, CancellationToken ct = default)
+    public async Task<PackageContents?> LoadPackageAsync(string virtualPath, CancellationToken ct = default)
     {
         EnsureInitialized();
 
-        // CUE4Parse LoadPackage expects paths without extension
         var withoutExt = StripPackageExtension(virtualPath);
         if (withoutExt is null) return null;
 
         return await Task.Run(() =>
         {
             ct.ThrowIfCancellationRequested();
-            var exports = Provider!.LoadPackage(withoutExt).GetExports();
+            var pkg = Provider!.LoadPackage(withoutExt);
             ct.ThrowIfCancellationRequested();
-            return JsonConvert.SerializeObject(exports, Formatting.Indented);
+
+            var exports = pkg.GetExports().ToList();
+            var imports = pkg switch
+            {
+                Package legacyPkg => legacyPkg.ImportMap.Select(i => i.ToString()),
+                IoPackage ioPkg   => ioPkg.ImportMap.Select(i => i.ToString()),
+                _                 => Enumerable.Empty<string>()
+            };
+            return new PackageContents(exports, imports.ToList());
         }, ct).ConfigureAwait(false);
     }
 

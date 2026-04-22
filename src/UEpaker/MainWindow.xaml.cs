@@ -1,7 +1,7 @@
-using System.Collections.ObjectModel;
 using System.IO;
 using System.Windows;
 using System.Windows.Controls;
+using CUE4Parse.UE4.Assets.Exports;
 using CUE4Parse.UE4.Versions;
 using Microsoft.Win32;
 using Viewer;
@@ -203,25 +203,32 @@ public partial class MainWindow : Window
 
         TxtPreviewPath.Text = node.FullPath;
         TxtPreviewHint.Visibility = Visibility.Collapsed;
-        TxtPreviewJson.Visibility = Visibility.Collapsed;
+        PreviewTabs.Visibility = Visibility.Collapsed;
         TxtPreviewLoading.Visibility = Visibility.Visible;
+        ExportListBox.ItemsSource = null;
+        PropertyTree.ItemsSource = null;
+        ImportListBox.ItemsSource = null;
 
         try
         {
-            var json = await _provider!.LoadPackageJsonAsync(node.FullPath, ct);
+            var contents = await _provider!.LoadPackageAsync(node.FullPath, ct);
 
             if (ct.IsCancellationRequested) return;
 
-            if (json is null)
+            if (contents is null)
             {
                 TxtPreviewHint.Text = "This file type cannot be previewed.";
                 TxtPreviewHint.Visibility = Visibility.Visible;
+                return;
             }
-            else
-            {
-                TxtPreviewJson.Text = json;
-                TxtPreviewJson.Visibility = Visibility.Visible;
-            }
+
+            ExportListBox.ItemsSource = contents.Exports;
+            ImportListBox.ItemsSource = contents.Imports;
+
+            if (contents.Exports.Count > 0)
+                ExportListBox.SelectedIndex = 0;
+
+            PreviewTabs.Visibility = Visibility.Visible;
         }
         catch (OperationCanceledException) { }
         catch (Exception ex)
@@ -239,14 +246,24 @@ public partial class MainWindow : Window
         }
     }
 
+    private void ExportListBox_SelectionChanged(object sender, SelectionChangedEventArgs e)
+    {
+        if (ExportListBox.SelectedItem is UObject export)
+            PropertyTree.ItemsSource = PropertyTreeBuilder.Build(export);
+        else
+            PropertyTree.ItemsSource = null;
+    }
+
     private void ClearPreview()
     {
         _previewCts?.Cancel();
         TxtPreviewPath.Text = string.Empty;
         TxtPreviewHint.Text = "Select an asset to preview its content.";
         TxtPreviewHint.Visibility = Visibility.Visible;
-        TxtPreviewJson.Visibility = Visibility.Collapsed;
-        TxtPreviewJson.Text = string.Empty;
+        PreviewTabs.Visibility = Visibility.Collapsed;
+        ExportListBox.ItemsSource = null;
+        PropertyTree.ItemsSource = null;
+        ImportListBox.ItemsSource = null;
         TxtPreviewLoading.Visibility = Visibility.Collapsed;
     }
 
