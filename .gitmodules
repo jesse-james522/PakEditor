@@ -1,0 +1,6 @@
+[submodule "libs/CUE4Parse"]
+	path = libs/CUE4Parse
+	url = https://github.com/FabianFG/CUE4Parse
+[submodule "libs/UAssetAPI"]
+	path = libs/UAssetAPI
+	url = https://github.com/atenfyr/UAssetAPI
