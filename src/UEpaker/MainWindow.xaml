@@ -132,23 +132,43 @@
                           Background="#DDDDDD"/>
 
             <!-- Preview panel -->
-            <Border Grid.Column="2" Padding="12">
-                <ScrollViewer VerticalScrollBarVisibility="Auto">
-                    <StackPanel x:Name="PreviewPanel">
-                        <TextBlock x:Name="TxtPreviewPath" FontSize="11" Foreground="#666"
-                                   TextWrapping="Wrap" Margin="0,0,0,8"/>
-                        <TextBlock x:Name="TxtPreviewHint" Text="Select an asset to preview."
-                                   Foreground="#AAA" FontSize="13"/>
-                        <ItemsControl x:Name="ExportList" Visibility="Collapsed">
-                            <ItemsControl.ItemTemplate>
-                                <DataTemplate>
-                                    <TextBlock Text="{Binding}" FontSize="12" Padding="0,2"/>
-                                </DataTemplate>
-                            </ItemsControl.ItemTemplate>
-                        </ItemsControl>
-                    </StackPanel>
-                </ScrollViewer>
-            </Border>
+            <Grid Grid.Column="2">
+                <Grid.RowDefinitions>
+                    <RowDefinition Height="Auto"/>
+                    <RowDefinition Height="*"/>
+                </Grid.RowDefinitions>
+
+                <!-- Path + loading indicator -->
+                <Border Grid.Row="0" Background="#FAFAFA" BorderBrush="#E0E0E0"
+                        BorderThickness="0,0,0,1" Padding="8,5">
+                    <Grid>
+                        <TextBlock x:Name="TxtPreviewPath" FontSize="11" FontFamily="Consolas"
+                                   Foreground="#555" TextTrimming="CharacterEllipsis"
+                                   VerticalAlignment="Center"/>
+                        <TextBlock x:Name="TxtPreviewLoading" Text="Loading…"
+                                   FontSize="11" Foreground="#999"
+                                   HorizontalAlignment="Right" VerticalAlignment="Center"
+                                   Visibility="Collapsed"/>
+                    </Grid>
+                </Border>
+
+                <!-- Hint shown when nothing selected -->
+                <TextBlock Grid.Row="1" x:Name="TxtPreviewHint"
+                           Text="Select an asset to preview its content."
+                           Foreground="#AAA" FontSize="13"
+                           HorizontalAlignment="Center" VerticalAlignment="Center"/>
+
+                <!-- JSON content -->
+                <TextBox Grid.Row="1" x:Name="TxtPreviewJson"
+                         IsReadOnly="True"
+                         FontFamily="Consolas" FontSize="12"
+                         HorizontalScrollBarVisibility="Auto"
+                         VerticalScrollBarVisibility="Auto"
+                         BorderThickness="0" Padding="8"
+                         TextWrapping="NoWrap"
+                         Visibility="Collapsed"
+                         Background="White"/>
+            </Grid>
         </Grid>
     </DockPanel>
 </Window>

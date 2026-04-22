@@ -14,6 +14,7 @@ public partial class MainWindow : Window
     private GameProvider? _provider;
     private IReadOnlyList<AssetTreeNode>? _allRoots;
     private CancellationTokenSource? _loadCts;
+    private CancellationTokenSource? _previewCts;
 
     public MainWindow()
     {
@@ -162,7 +163,7 @@ public partial class MainWindow : Window
     private void AssetTree_SelectedItemChanged(object sender, RoutedPropertyChangedEventArgs<object> e)
     {
         if (e.NewValue is AssetTreeNode node && !node.IsFolder)
-            ShowPreview(node);
+            _ = ShowPreviewAsync(node);
         else
             ClearPreview();
     }
@@ -194,25 +195,59 @@ public partial class MainWindow : Window
 
     // ── Preview ───────────────────────────────────────────────────────────────
 
-    private void ShowPreview(AssetTreeNode node)
+    private async Task ShowPreviewAsync(AssetTreeNode node)
     {
+        _previewCts?.Cancel();
+        _previewCts = new CancellationTokenSource();
+        var ct = _previewCts.Token;
+
         TxtPreviewPath.Text = node.FullPath;
         TxtPreviewHint.Visibility = Visibility.Collapsed;
-        ExportList.Visibility = Visibility.Collapsed;
+        TxtPreviewJson.Visibility = Visibility.Collapsed;
+        TxtPreviewLoading.Visibility = Visibility.Visible;
 
-        // Placeholder: just show the path for now.
-        // The Editor module will replace this with the full property tree.
-        TxtPreviewHint.Text = "(Property tree will appear here once the Editor module is implemented.)";
-        TxtPreviewHint.Visibility = Visibility.Visible;
+        try
+        {
+            var json = await _provider!.LoadPackageJsonAsync(node.FullPath, ct);
+
+            if (ct.IsCancellationRequested) return;
+
+            if (json is null)
+            {
+                TxtPreviewHint.Text = "This file type cannot be previewed.";
+                TxtPreviewHint.Visibility = Visibility.Visible;
+            }
+            else
+            {
+                TxtPreviewJson.Text = json;
+                TxtPreviewJson.Visibility = Visibility.Visible;
+            }
+        }
+        catch (OperationCanceledException) { }
+        catch (Exception ex)
+        {
+            if (!ct.IsCancellationRequested)
+            {
+                TxtPreviewHint.Text = $"Could not load asset: {ex.Message}";
+                TxtPreviewHint.Visibility = Visibility.Visible;
+            }
+        }
+        finally
+        {
+            if (!ct.IsCancellationRequested)
+                TxtPreviewLoading.Visibility = Visibility.Collapsed;
+        }
     }
 
     private void ClearPreview()
     {
+        _previewCts?.Cancel();
         TxtPreviewPath.Text = string.Empty;
-        TxtPreviewHint.Text = "Select an asset to preview.";
+        TxtPreviewHint.Text = "Select an asset to preview its content.";
         TxtPreviewHint.Visibility = Visibility.Visible;
-        ExportList.Visibility = Visibility.Collapsed;
-        ExportList.ItemsSource = null;
+        TxtPreviewJson.Visibility = Visibility.Collapsed;
+        TxtPreviewJson.Text = string.Empty;
+        TxtPreviewLoading.Visibility = Visibility.Collapsed;
     }
 
     // ── Helpers ───────────────────────────────────────────────────────────────
@@ -226,6 +261,7 @@ public partial class MainWindow : Window
     protected override void OnClosed(EventArgs e)
     {
         _loadCts?.Cancel();
+        _previewCts?.Cancel();
         _provider?.Dispose();
         base.OnClosed(e);
     }
