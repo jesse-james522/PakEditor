@@ -3,11 +3,19 @@ using CUE4Parse.Encryption.Aes;
 using CUE4Parse.FileProvider;
 using CUE4Parse.MappingsProvider;
 using CUE4Parse.UE4.Assets;
-using CUE4Parse.UE4.Assets.Exports;
 using CUE4Parse.UE4.Objects.Core.Misc;
 using CUE4Parse.UE4.Versions;
+using Newtonsoft.Json;
 
 namespace Viewer;
+
+public enum PreviewResult { Json, HeavyAsset, Unsupported, Error }
+
+public record PackagePreview(
+    PreviewResult Result,
+    string? Json = null,
+    IReadOnlyList<string>? Imports = null,
+    string? ErrorMessage = null);
 
 public class GameProvider : IDisposable
 {
@@ -15,14 +23,22 @@ public class GameProvider : IDisposable
     public bool IsInitialized { get; private set; }
     public string? MappingsWarning { get; private set; }
 
-    /// <summary>
-    /// Full initialization sequence:
-    ///   1. Oodle + Zlib-ng helpers (download on first run, cache next to exe)
-    ///   2. Create DefaultFileProvider and scan pak index
-    ///   3. Submit AES key
-    ///   4. Load .usmap mappings (non-fatal if missing/corrupt)
-    /// Progress is reported as (0–100, message) for display in the UI.
-    /// </summary>
+    private static readonly HashSet<string> HeavyExportClasses = new(StringComparer.OrdinalIgnoreCase)
+    {
+        "StaticMesh", "SkeletalMesh", "SkeletalMeshLODSettings",
+        "Texture2D", "TextureCube", "TextureRenderTarget2D", "VolumeTexture",
+        "SoundWave", "SoundCue", "MetaSoundSource",
+        "AnimSequence", "AnimMontage", "AnimComposite", "BlendSpace",
+        "AnimBlueprint", "AnimBlueprintGeneratedClass",
+        "World",
+        "Material", "MaterialInstanceConstant", "MaterialInstanceDynamic", "MaterialFunction",
+    };
+
+    private static readonly HashSet<string> PackageExtensions = new(StringComparer.OrdinalIgnoreCase)
+    {
+        ".uasset", ".umap", ".uexp"
+    };
+
     public async Task InitializeAsync(
         string pakDirectory,
         EGame ueVersion,
@@ -76,10 +92,6 @@ public class GameProvider : IDisposable
         progress?.Report((100, "Ready"));
     }
 
-    /// <summary>
-    /// Returns all file keys from the provider, suitable for populating the asset tree.
-    /// Keys are virtual paths as CUE4Parse sees them (no extension stripping needed here).
-    /// </summary>
     public IEnumerable<string> GetAllFiles()
     {
         EnsureInitialized();
@@ -87,43 +99,50 @@ public class GameProvider : IDisposable
     }
 
     /// <summary>
-    /// Loads a package and returns its exports.
-    /// The path should include the file extension as it appears in the tree.
-    /// Returns null if the path is not a loadable package type.
+    /// Loads a package and returns syntax-colourable JSON plus its import list.
+    /// If previewHeavyAssets is false and the package is a mesh/texture/sound/etc.,
+    /// returns HeavyAsset instead of deserialising.
     /// </summary>
-    public async Task<PackageContents?> LoadPackageAsync(string virtualPath, CancellationToken ct = default)
+    public async Task<PackagePreview> LoadPreviewAsync(
+        string virtualPath,
+        bool previewHeavyAssets,
+        CancellationToken ct = default)
     {
         EnsureInitialized();
 
         var withoutExt = StripPackageExtension(virtualPath);
-        if (withoutExt is null) return null;
+        if (withoutExt is null)
+            return new PackagePreview(PreviewResult.Unsupported);
 
         return await Task.Run(() =>
         {
             ct.ThrowIfCancellationRequested();
+
             var pkg = Provider!.LoadPackage(withoutExt);
             ct.ThrowIfCancellationRequested();
 
             var exports = pkg.GetExports().ToList();
+
+            if (!previewHeavyAssets && exports.Count > 0)
+            {
+                var firstClass = exports[0].GetType().Name.TrimStart('U');
+                if (HeavyExportClasses.Contains(firstClass))
+                    return new PackagePreview(PreviewResult.HeavyAsset);
+            }
+
+            ct.ThrowIfCancellationRequested();
+
+            var json = JsonConvert.SerializeObject(exports, Formatting.Indented);
+
             var imports = pkg switch
             {
-                Package legacyPkg => legacyPkg.ImportMap.Select(i => i.ToString()),
-                IoPackage ioPkg   => ioPkg.ImportMap.Select(i => i.ToString()),
-                _                 => Enumerable.Empty<string>()
+                Package legacyPkg => legacyPkg.ImportMap.Select(i => i.ToString()).ToList(),
+                IoPackage ioPkg   => ioPkg.ImportMap.Select(i => i.ToString()).ToList(),
+                _                 => (IReadOnlyList<string>)[]
             };
-            return new PackageContents(exports, imports.ToList());
+
+            return new PackagePreview(PreviewResult.Json, json, imports);
         }, ct).ConfigureAwait(false);
-    }
-
-    private static readonly HashSet<string> PackageExtensions = new(StringComparer.OrdinalIgnoreCase)
-    {
-        ".uasset", ".umap", ".uexp"
-    };
-
-    private static string? StripPackageExtension(string path)
-    {
-        var ext = Path.GetExtension(path);
-        return PackageExtensions.Contains(ext) ? path[..^ext.Length] : null;
     }
 
     public void Dispose()
@@ -139,6 +158,12 @@ public class GameProvider : IDisposable
             throw new InvalidOperationException("GameProvider has not been initialized.");
     }
 
+    private static string? StripPackageExtension(string path)
+    {
+        var ext = Path.GetExtension(path);
+        return PackageExtensions.Contains(ext) ? path[..^ext.Length] : null;
+    }
+
     private static async Task InitCompressionHelpersAsync(
         IProgress<(int Percent, string Message)>? progress,
         CancellationToken ct)
@@ -150,16 +175,8 @@ public class GameProvider : IDisposable
             var oodlePath = Path.Combine(baseDir, OodleHelper.OodleFileName);
             if (!File.Exists(oodlePath))
                 progress?.Report((7, "Downloading Oodle (one-time)…"));
-            try
-            {
-                await OodleHelper.InitializeAsync(oodlePath).ConfigureAwait(false);
-            }
-            catch (Exception ex)
-            {
-                // Non-fatal: assets compressed with Oodle will fail to decompress,
-                // but the provider itself will still load.
-                System.Diagnostics.Debug.WriteLine($"Oodle init failed: {ex.Message}");
-            }
+            try { await OodleHelper.InitializeAsync(oodlePath).ConfigureAwait(false); }
+            catch (Exception ex) { System.Diagnostics.Debug.WriteLine($"Oodle init failed: {ex.Message}"); }
         }
 
         ct.ThrowIfCancellationRequested();
@@ -169,14 +186,8 @@ public class GameProvider : IDisposable
             var zlibPath = Path.Combine(baseDir, ZlibHelper.DllName);
             if (!File.Exists(zlibPath))
                 progress?.Report((15, "Downloading Zlib-ng (one-time)…"));
-            try
-            {
-                await ZlibHelper.InitializeAsync(zlibPath).ConfigureAwait(false);
-            }
-            catch (Exception ex)
-            {
-                System.Diagnostics.Debug.WriteLine($"Zlib init failed: {ex.Message}");
-            }
+            try { await ZlibHelper.InitializeAsync(zlibPath).ConfigureAwait(false); }
+            catch (Exception ex) { System.Diagnostics.Debug.WriteLine($"Zlib init failed: {ex.Message}"); }
         }
     }
 }

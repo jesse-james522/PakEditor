@@ -1,7 +1,6 @@
 using System.IO;
 using System.Windows;
 using System.Windows.Controls;
-using CUE4Parse.UE4.Assets.Exports;
 using CUE4Parse.UE4.Versions;
 using Microsoft.Win32;
 using Viewer;
@@ -50,6 +49,7 @@ public partial class MainWindow : Window
         TxtAesKey.Text = _settings.AesKey;
         TxtUsmap.Text = _settings.MappingsPath;
         CmbVersion.SelectedItem = _settings.UeVersion;
+        ChkHeavyAssets.IsChecked = _settings.PreviewHeavyAssets;
     }
 
     private void SaveSettingsFromUi()
@@ -58,6 +58,7 @@ public partial class MainWindow : Window
         _settings.AesKey = TxtAesKey.Text.Trim();
         _settings.MappingsPath = TxtUsmap.Text.Trim();
         _settings.UeVersion = CmbVersion.SelectedItem is EGame v ? v : EGame.GAME_UE5_6;
+        _settings.PreviewHeavyAssets = ChkHeavyAssets.IsChecked == true;
         _settings.Save();
     }
 
@@ -183,7 +184,6 @@ public partial class MainWindow : Window
             return;
         }
 
-        // Flat search: show matching file nodes directly (skip folder hierarchy)
         var matches = _provider?.GetAllFiles()
             .Where(p => p.Contains(query, StringComparison.OrdinalIgnoreCase))
             .OrderBy(p => p)
@@ -205,30 +205,39 @@ public partial class MainWindow : Window
         TxtPreviewHint.Visibility = Visibility.Collapsed;
         PreviewTabs.Visibility = Visibility.Collapsed;
         TxtPreviewLoading.Visibility = Visibility.Visible;
-        ExportListBox.ItemsSource = null;
-        PropertyTree.ItemsSource = null;
+        RtbJson.Document = new System.Windows.Documents.FlowDocument();
         ImportListBox.ItemsSource = null;
 
         try
         {
-            var contents = await _provider!.LoadPackageAsync(node.FullPath, ct);
+            var preview = await _provider!.LoadPreviewAsync(
+                node.FullPath, _settings.PreviewHeavyAssets, ct);
 
             if (ct.IsCancellationRequested) return;
 
-            if (contents is null)
+            switch (preview.Result)
             {
-                TxtPreviewHint.Text = "This file type cannot be previewed.";
-                TxtPreviewHint.Visibility = Visibility.Visible;
-                return;
+                case PreviewResult.Json:
+                    JsonSyntaxColorizer.Apply(RtbJson, preview.Json!);
+                    ImportListBox.ItemsSource = preview.Imports;
+                    PreviewTabs.Visibility = Visibility.Visible;
+                    break;
+
+                case PreviewResult.HeavyAsset:
+                    TxtPreviewHint.Text = "Heavy asset — enable \"Preview meshes/textures/sounds\" in settings to load.";
+                    TxtPreviewHint.Visibility = Visibility.Visible;
+                    break;
+
+                case PreviewResult.Unsupported:
+                    TxtPreviewHint.Text = "This file type cannot be previewed.";
+                    TxtPreviewHint.Visibility = Visibility.Visible;
+                    break;
+
+                case PreviewResult.Error:
+                    TxtPreviewHint.Text = $"Could not load asset: {preview.ErrorMessage}";
+                    TxtPreviewHint.Visibility = Visibility.Visible;
+                    break;
             }
-
-            ExportListBox.ItemsSource = contents.Exports;
-            ImportListBox.ItemsSource = contents.Imports;
-
-            if (contents.Exports.Count > 0)
-                ExportListBox.SelectedIndex = 0;
-
-            PreviewTabs.Visibility = Visibility.Visible;
         }
         catch (OperationCanceledException) { }
         catch (Exception ex)
@@ -246,14 +255,6 @@ public partial class MainWindow : Window
         }
     }
 
-    private void ExportListBox_SelectionChanged(object sender, SelectionChangedEventArgs e)
-    {
-        if (ExportListBox.SelectedItem is UObject export)
-            PropertyTree.ItemsSource = PropertyTreeBuilder.Build(export);
-        else
-            PropertyTree.ItemsSource = null;
-    }
-
     private void ClearPreview()
     {
         _previewCts?.Cancel();
@@ -261,8 +262,7 @@ public partial class MainWindow : Window
         TxtPreviewHint.Text = "Select an asset to preview its content.";
         TxtPreviewHint.Visibility = Visibility.Visible;
         PreviewTabs.Visibility = Visibility.Collapsed;
-        ExportListBox.ItemsSource = null;
-        PropertyTree.ItemsSource = null;
+        RtbJson.Document = new System.Windows.Documents.FlowDocument();
         ImportListBox.ItemsSource = null;
         TxtPreviewLoading.Visibility = Visibility.Collapsed;
     }

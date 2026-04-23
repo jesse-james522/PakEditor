@@ -21,6 +21,7 @@ public class ProviderSettings
     public string AesKey { get; set; } = string.Empty;
     public string MappingsPath { get; set; } = string.Empty;
     public EGame UeVersion { get; set; } = EGame.GAME_UE5_6;
+    public bool PreviewHeavyAssets { get; set; } = false;
 
     public static ProviderSettings Load()
     {

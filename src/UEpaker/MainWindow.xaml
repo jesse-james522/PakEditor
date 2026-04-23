@@ -5,7 +5,6 @@
         Title="UEpaker" Height="700" Width="1100" MinHeight="500" MinWidth="700">
 
     <Window.Resources>
-        <!-- Folder/file icons via unicode — no image assets needed -->
         <Style x:Key="TreeItemStyle" TargetType="TreeViewItem">
             <Setter Property="IsExpanded" Value="False"/>
             <EventSetter Event="Expanded" Handler="TreeItem_Expanded"/>
@@ -43,6 +42,7 @@
                     <ColumnDefinition Width="8"/>
                     <ColumnDefinition Width="Auto"/>
                     <ColumnDefinition Width="*" MaxWidth="320"/>
+                    <ColumnDefinition Width="Auto"/>
                     <ColumnDefinition Width="8"/>
                     <ColumnDefinition Width="Auto"/>
                     <ColumnDefinition Width="120"/>
@@ -57,29 +57,34 @@
 
                 <!-- Row 0: Pak Directory -->
                 <TextBlock Grid.Row="0" Grid.Column="0" Text="Pak Dir:" VerticalAlignment="Center" Margin="0,0,6,0"/>
-                <TextBox  Grid.Row="0" Grid.Column="1" Grid.ColumnSpan="7"
+                <TextBox  Grid.Row="0" Grid.Column="1" Grid.ColumnSpan="9"
                           x:Name="TxtPakDir" VerticalAlignment="Center"
-                          Text="" ToolTip="Directory containing .pak / .utoc / .ucas files"/>
-                <Button   Grid.Row="0" Grid.Column="8" Content="Browse…"
+                          ToolTip="Directory containing .pak / .utoc / .ucas files"/>
+                <Button   Grid.Row="0" Grid.Column="10" Grid.ColumnSpan="2" Content="Browse…"
                           Click="BtnBrowsePak_Click" Padding="8,2" Margin="4,0,0,0"/>
 
-                <!-- Row 2: AES key, usmap, version, Load -->
+                <!-- Row 2: AES, mappings, version, heavy-asset toggle, load -->
                 <TextBlock Grid.Row="2" Grid.Column="0" Text="AES Key:" VerticalAlignment="Center" Margin="0,0,6,0"/>
                 <TextBox  Grid.Row="2" Grid.Column="1" x:Name="TxtAesKey"
                           VerticalAlignment="Center" FontFamily="Consolas"
-                          ToolTip="Hex AES key, e.g. 0x61D4FD0F… (leave blank if paks are not encrypted)"/>
+                          ToolTip="Hex AES key (leave blank if paks are not encrypted)"/>
 
                 <TextBlock Grid.Row="2" Grid.Column="4" Text="Mappings:" VerticalAlignment="Center" Margin="0,0,6,0"/>
                 <TextBox  Grid.Row="2" Grid.Column="5" x:Name="TxtUsmap"
                           VerticalAlignment="Center" ToolTip=".usmap mappings file for unversioned properties"/>
-                <Button   Grid.Row="2" Grid.Column="6" Grid.ColumnSpan="2" Content="Browse…"
+                <Button   Grid.Row="2" Grid.Column="6" Content="Browse…"
                           Click="BtnBrowseUsmap_Click" Padding="8,2" Margin="4,0,0,0"/>
 
                 <ComboBox Grid.Row="2" Grid.Column="8" x:Name="CmbVersion"
                           VerticalAlignment="Center" Margin="4,0,0,0"
                           ToolTip="Unreal Engine version of the target game"/>
 
-                <Button   Grid.Row="2" Grid.Column="10" x:Name="BtnLoad"
+                <CheckBox Grid.Row="2" Grid.Column="10" x:Name="ChkHeavyAssets"
+                          Content="Preview meshes/textures/sounds"
+                          VerticalAlignment="Center" Margin="4,0,0,0"
+                          ToolTip="When unchecked, meshes, textures, sounds, animations, maps and materials show a placeholder instead of loading JSON"/>
+
+                <Button   Grid.Row="2" Grid.Column="11" x:Name="BtnLoad"
                           Content="Load" Width="70" Padding="8,4"
                           Margin="8,0,0,0" FontWeight="SemiBold"
                           Click="BtnLoad_Click"/>
@@ -102,7 +107,7 @@
             </Grid>
         </Border>
 
-        <!-- Main content: tree + preview -->
+        <!-- Main content -->
         <Grid>
             <Grid.ColumnDefinitions>
                 <ColumnDefinition Width="320" MinWidth="150"/>
@@ -110,11 +115,11 @@
                 <ColumnDefinition Width="*"/>
             </Grid.ColumnDefinitions>
 
-            <!-- Asset tree panel -->
+            <!-- Asset tree -->
             <DockPanel Grid.Column="0">
                 <TextBox DockPanel.Dock="Top" x:Name="TxtSearch"
                          Padding="4,3" Margin="4" FontSize="11"
-                         Text="" TextChanged="TxtSearch_TextChanged"
+                         TextChanged="TxtSearch_TextChanged"
                          ToolTip="Filter assets"/>
                 <TextBlock DockPanel.Dock="Top" x:Name="TxtSearchHint"
                            Text="Search…" Margin="8,0,0,-18" FontSize="11"
@@ -152,67 +157,28 @@
                     </Grid>
                 </Border>
 
-                <!-- Hint shown when nothing selected -->
+                <!-- Hint / placeholder -->
                 <TextBlock Grid.Row="1" x:Name="TxtPreviewHint"
                            Text="Select an asset to preview its content."
                            Foreground="#AAA" FontSize="13"
                            HorizontalAlignment="Center" VerticalAlignment="Center"/>
 
-                <!-- Tabbed content view -->
+                <!-- JSON + Imports tabs -->
                 <TabControl Grid.Row="1" x:Name="PreviewTabs" Visibility="Collapsed">
-
-                    <!-- Exports tab: export list + property tree side by side -->
-                    <TabItem Header="Exports">
-                        <Grid>
-                            <Grid.ColumnDefinitions>
-                                <ColumnDefinition Width="200" MinWidth="100"/>
-                                <ColumnDefinition Width="4"/>
-                                <ColumnDefinition Width="*"/>
-                            </Grid.ColumnDefinitions>
-
-                            <ListBox x:Name="ExportListBox" Grid.Column="0"
-                                     FontFamily="Consolas" FontSize="11"
-                                     SelectionChanged="ExportListBox_SelectionChanged"
-                                     DisplayMemberPath="Name"
-                                     ScrollViewer.HorizontalScrollBarVisibility="Auto"/>
-
-                            <GridSplitter Grid.Column="1" Width="4" HorizontalAlignment="Stretch"
-                                          Background="#DDDDDD"/>
-
-                            <!-- Property tree: Name | Type | Value columns -->
-                            <TreeView x:Name="PropertyTree" Grid.Column="2"
-                                      FontFamily="Consolas" FontSize="12"
-                                      VirtualizingStackPanel.IsVirtualizing="True"
-                                      VirtualizingStackPanel.VirtualizationMode="Recycling">
-                                <TreeView.ItemTemplate>
-                                    <HierarchicalDataTemplate DataType="{x:Type local:PropertyTreeNode}"
-                                                              ItemsSource="{Binding Children}">
-                                        <Grid>
-                                            <Grid.ColumnDefinitions>
-                                                <ColumnDefinition Width="240"/>
-                                                <ColumnDefinition Width="100"/>
-                                                <ColumnDefinition Width="*"/>
-                                            </Grid.ColumnDefinitions>
-                                            <TextBlock Grid.Column="0" Text="{Binding Label}"
-                                                       Foreground="#1A1A8C" Margin="0,0,8,0"/>
-                                            <TextBlock Grid.Column="1" Text="{Binding TypeName}"
-                                                       Foreground="#888" Margin="0,0,8,0"/>
-                                            <TextBlock Grid.Column="2" Text="{Binding DisplayValue}"
-                                                       Foreground="#1C4A1C" TextTrimming="CharacterEllipsis"/>
-                                        </Grid>
-                                    </HierarchicalDataTemplate>
-                                </TreeView.ItemTemplate>
-                            </TreeView>
-                        </Grid>
+                    <TabItem Header="Properties">
+                        <RichTextBox x:Name="RtbJson"
+                                     IsReadOnly="True"
+                                     IsDocumentEnabled="False"
+                                     BorderThickness="0"
+                                     HorizontalScrollBarVisibility="Auto"
+                                     VerticalScrollBarVisibility="Auto"
+                                     Background="White"/>
                     </TabItem>
-
-                    <!-- Imports tab -->
                     <TabItem Header="Imports">
                         <ListBox x:Name="ImportListBox"
                                  FontFamily="Consolas" FontSize="11"
                                  ScrollViewer.HorizontalScrollBarVisibility="Auto"/>
                     </TabItem>
-
                 </TabControl>
             </Grid>
         </Grid>
