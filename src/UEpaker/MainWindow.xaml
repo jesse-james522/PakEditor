@@ -27,69 +27,21 @@
         </DataTemplate>
 
         <local:AssetTreeNodeTemplateSelector x:Key="NodeTemplateSelector"/>
+
+        <Style x:Key="FormLabel" TargetType="TextBlock">
+            <Setter Property="VerticalAlignment" Value="Center"/>
+            <Setter Property="Margin" Value="0,0,8,0"/>
+            <Setter Property="FontSize" Value="12"/>
+        </Style>
+
+        <Style x:Key="FormField" TargetType="TextBox">
+            <Setter Property="VerticalAlignment" Value="Center"/>
+            <Setter Property="Padding" Value="4,3"/>
+            <Setter Property="FontSize" Value="12"/>
+        </Style>
     </Window.Resources>
 
     <DockPanel>
-
-        <!-- Settings bar -->
-        <Border DockPanel.Dock="Top" Background="#F0F0F0" BorderBrush="#CCCCCC"
-                BorderThickness="0,0,0,1" Padding="8,6">
-            <Grid>
-                <Grid.ColumnDefinitions>
-                    <ColumnDefinition Width="Auto"/>
-                    <ColumnDefinition Width="*"/>
-                    <ColumnDefinition Width="Auto"/>
-                    <ColumnDefinition Width="8"/>
-                    <ColumnDefinition Width="Auto"/>
-                    <ColumnDefinition Width="*" MaxWidth="320"/>
-                    <ColumnDefinition Width="Auto"/>
-                    <ColumnDefinition Width="8"/>
-                    <ColumnDefinition Width="Auto"/>
-                    <ColumnDefinition Width="120"/>
-                    <ColumnDefinition Width="8"/>
-                    <ColumnDefinition Width="Auto"/>
-                </Grid.ColumnDefinitions>
-                <Grid.RowDefinitions>
-                    <RowDefinition Height="Auto"/>
-                    <RowDefinition Height="4"/>
-                    <RowDefinition Height="Auto"/>
-                </Grid.RowDefinitions>
-
-                <!-- Row 0: Pak Directory -->
-                <TextBlock Grid.Row="0" Grid.Column="0" Text="Pak Dir:" VerticalAlignment="Center" Margin="0,0,6,0"/>
-                <TextBox  Grid.Row="0" Grid.Column="1" Grid.ColumnSpan="9"
-                          x:Name="TxtPakDir" VerticalAlignment="Center"
-                          ToolTip="Directory containing .pak / .utoc / .ucas files"/>
-                <Button   Grid.Row="0" Grid.Column="10" Grid.ColumnSpan="2" Content="Browse…"
-                          Click="BtnBrowsePak_Click" Padding="8,2" Margin="4,0,0,0"/>
-
-                <!-- Row 2: AES, mappings, version, heavy-asset toggle, load -->
-                <TextBlock Grid.Row="2" Grid.Column="0" Text="AES Key:" VerticalAlignment="Center" Margin="0,0,6,0"/>
-                <TextBox  Grid.Row="2" Grid.Column="1" x:Name="TxtAesKey"
-                          VerticalAlignment="Center" FontFamily="Consolas"
-                          ToolTip="Hex AES key (leave blank if paks are not encrypted)"/>
-
-                <TextBlock Grid.Row="2" Grid.Column="4" Text="Mappings:" VerticalAlignment="Center" Margin="0,0,6,0"/>
-                <TextBox  Grid.Row="2" Grid.Column="5" x:Name="TxtUsmap"
-                          VerticalAlignment="Center" ToolTip=".usmap mappings file for unversioned properties"/>
-                <Button   Grid.Row="2" Grid.Column="6" Content="Browse…"
-                          Click="BtnBrowseUsmap_Click" Padding="8,2" Margin="4,0,0,0"/>
-
-                <ComboBox Grid.Row="2" Grid.Column="8" x:Name="CmbVersion"
-                          VerticalAlignment="Center" Margin="4,0,0,0"
-                          ToolTip="Unreal Engine version of the target game"/>
-
-                <CheckBox Grid.Row="2" Grid.Column="10" x:Name="ChkHeavyAssets"
-                          Content="Preview meshes/textures/sounds"
-                          VerticalAlignment="Center" Margin="4,0,0,0"
-                          ToolTip="When unchecked, meshes, textures, sounds, animations, maps and materials show a placeholder instead of loading JSON"/>
-
-                <Button   Grid.Row="2" Grid.Column="11" x:Name="BtnLoad"
-                          Content="Load" Width="70" Padding="8,4"
-                          Margin="8,0,0,0" FontWeight="SemiBold"
-                          Click="BtnLoad_Click"/>
-            </Grid>
-        </Border>
 
         <!-- Status bar -->
         <Border DockPanel.Dock="Bottom" Background="#F0F0F0" BorderBrush="#CCCCCC"
@@ -107,80 +59,179 @@
             </Grid>
         </Border>
 
-        <!-- Main content -->
-        <Grid>
-            <Grid.ColumnDefinitions>
-                <ColumnDefinition Width="320" MinWidth="150"/>
-                <ColumnDefinition Width="4"/>
-                <ColumnDefinition Width="*"/>
-            </Grid.ColumnDefinitions>
+        <!-- Top-level tabs -->
+        <TabControl x:Name="MainTabs">
 
-            <!-- Asset tree -->
-            <DockPanel Grid.Column="0">
-                <TextBox DockPanel.Dock="Top" x:Name="TxtSearch"
-                         Padding="4,3" Margin="4" FontSize="11"
-                         TextChanged="TxtSearch_TextChanged"
-                         ToolTip="Filter assets"/>
-                <TextBlock DockPanel.Dock="Top" x:Name="TxtSearchHint"
-                           Text="Search…" Margin="8,0,0,-18" FontSize="11"
-                           Foreground="#AAA" IsHitTestVisible="False"/>
-                <TreeView x:Name="AssetTree"
-                          VirtualizingStackPanel.IsVirtualizing="True"
-                          VirtualizingStackPanel.VirtualizationMode="Recycling"
-                          ItemTemplateSelector="{StaticResource NodeTemplateSelector}"
-                          ItemContainerStyle="{StaticResource TreeItemStyle}"
-                          SelectedItemChanged="AssetTree_SelectedItemChanged"
-                          FontSize="12"/>
-            </DockPanel>
+            <!-- ── Viewer tab ──────────────────────────────────────────── -->
+            <TabItem Header="Viewer">
+                <Grid>
+                    <Grid.ColumnDefinitions>
+                        <ColumnDefinition Width="320" MinWidth="150"/>
+                        <ColumnDefinition Width="4"/>
+                        <ColumnDefinition Width="*"/>
+                    </Grid.ColumnDefinitions>
 
-            <GridSplitter Grid.Column="1" Width="4" HorizontalAlignment="Stretch"
-                          Background="#DDDDDD"/>
+                    <!-- Asset tree -->
+                    <DockPanel Grid.Column="0">
+                        <TextBox DockPanel.Dock="Top" x:Name="TxtSearch"
+                                 Padding="4,3" Margin="4" FontSize="11"
+                                 TextChanged="TxtSearch_TextChanged"
+                                 ToolTip="Filter assets"/>
+                        <TextBlock DockPanel.Dock="Top" x:Name="TxtSearchHint"
+                                   Text="Search…" Margin="8,0,0,-18" FontSize="11"
+                                   Foreground="#AAA" IsHitTestVisible="False"/>
+                        <TreeView x:Name="AssetTree"
+                                  VirtualizingStackPanel.IsVirtualizing="True"
+                                  VirtualizingStackPanel.VirtualizationMode="Recycling"
+                                  ItemTemplateSelector="{StaticResource NodeTemplateSelector}"
+                                  ItemContainerStyle="{StaticResource TreeItemStyle}"
+                                  SelectedItemChanged="AssetTree_SelectedItemChanged"
+                                  FontSize="12"/>
+                    </DockPanel>
 
-            <!-- Preview panel -->
-            <Grid Grid.Column="2">
-                <Grid.RowDefinitions>
-                    <RowDefinition Height="Auto"/>
-                    <RowDefinition Height="*"/>
-                </Grid.RowDefinitions>
+                    <GridSplitter Grid.Column="1" Width="4" HorizontalAlignment="Stretch"
+                                  Background="#DDDDDD"/>
 
-                <!-- Path + loading indicator -->
-                <Border Grid.Row="0" Background="#FAFAFA" BorderBrush="#E0E0E0"
-                        BorderThickness="0,0,0,1" Padding="8,5">
-                    <Grid>
-                        <TextBlock x:Name="TxtPreviewPath" FontSize="11" FontFamily="Consolas"
-                                   Foreground="#555" TextTrimming="CharacterEllipsis"
-                                   VerticalAlignment="Center"/>
-                        <TextBlock x:Name="TxtPreviewLoading" Text="Loading…"
-                                   FontSize="11" Foreground="#999"
-                                   HorizontalAlignment="Right" VerticalAlignment="Center"
-                                   Visibility="Collapsed"/>
+                    <!-- Preview panel -->
+                    <Grid Grid.Column="2">
+                        <Grid.RowDefinitions>
+                            <RowDefinition Height="Auto"/>
+                            <RowDefinition Height="*"/>
+                        </Grid.RowDefinitions>
+
+                        <!-- Path + loading indicator -->
+                        <Border Grid.Row="0" Background="#FAFAFA" BorderBrush="#E0E0E0"
+                                BorderThickness="0,0,0,1" Padding="8,5">
+                            <Grid>
+                                <TextBlock x:Name="TxtPreviewPath" FontSize="11" FontFamily="Consolas"
+                                           Foreground="#555" TextTrimming="CharacterEllipsis"
+                                           VerticalAlignment="Center"/>
+                                <TextBlock x:Name="TxtPreviewLoading" Text="Loading…"
+                                           FontSize="11" Foreground="#999"
+                                           HorizontalAlignment="Right" VerticalAlignment="Center"
+                                           Visibility="Collapsed"/>
+                            </Grid>
+                        </Border>
+
+                        <!-- Hint / placeholder -->
+                        <TextBlock Grid.Row="1" x:Name="TxtPreviewHint"
+                                   Text="Select an asset to preview its content."
+                                   Foreground="#AAA" FontSize="13"
+                                   HorizontalAlignment="Center" VerticalAlignment="Center"/>
+
+                        <!-- Properties + Imports tabs -->
+                        <TabControl Grid.Row="1" x:Name="PreviewTabs" Visibility="Collapsed">
+                            <TabItem Header="Properties">
+                                <RichTextBox x:Name="RtbJson"
+                                             IsReadOnly="True"
+                                             IsDocumentEnabled="False"
+                                             BorderThickness="0"
+                                             HorizontalScrollBarVisibility="Auto"
+                                             VerticalScrollBarVisibility="Auto"
+                                             Background="White"/>
+                            </TabItem>
+                            <TabItem Header="Imports">
+                                <ListBox x:Name="ImportListBox"
+                                         FontFamily="Consolas" FontSize="11"
+                                         ScrollViewer.HorizontalScrollBarVisibility="Auto"/>
+                            </TabItem>
+                        </TabControl>
                     </Grid>
-                </Border>
+                </Grid>
+            </TabItem>
 
-                <!-- Hint / placeholder -->
-                <TextBlock Grid.Row="1" x:Name="TxtPreviewHint"
-                           Text="Select an asset to preview its content."
-                           Foreground="#AAA" FontSize="13"
-                           HorizontalAlignment="Center" VerticalAlignment="Center"/>
+            <!-- ── Settings tab ───────────────────────────────────────── -->
+            <TabItem Header="Settings">
+                <ScrollViewer VerticalScrollBarVisibility="Auto">
+                    <StackPanel Margin="24,20" MaxWidth="600">
 
-                <!-- JSON + Imports tabs -->
-                <TabControl Grid.Row="1" x:Name="PreviewTabs" Visibility="Collapsed">
-                    <TabItem Header="Properties">
-                        <RichTextBox x:Name="RtbJson"
-                                     IsReadOnly="True"
-                                     IsDocumentEnabled="False"
-                                     BorderThickness="0"
-                                     HorizontalScrollBarVisibility="Auto"
-                                     VerticalScrollBarVisibility="Auto"
-                                     Background="White"/>
-                    </TabItem>
-                    <TabItem Header="Imports">
-                        <ListBox x:Name="ImportListBox"
-                                 FontFamily="Consolas" FontSize="11"
-                                 ScrollViewer.HorizontalScrollBarVisibility="Auto"/>
-                    </TabItem>
-                </TabControl>
-            </Grid>
-        </Grid>
+                        <!-- Section: Source -->
+                        <TextBlock Text="Source" FontSize="14" FontWeight="SemiBold"
+                                   Margin="0,0,0,10"/>
+
+                        <Grid Margin="0,0,0,10">
+                            <Grid.ColumnDefinitions>
+                                <ColumnDefinition Width="110"/>
+                                <ColumnDefinition Width="*"/>
+                                <ColumnDefinition Width="Auto"/>
+                            </Grid.ColumnDefinitions>
+                            <TextBlock Grid.Column="0" Text="Pak directory" Style="{StaticResource FormLabel}"/>
+                            <TextBox   Grid.Column="1" x:Name="TxtPakDir" Style="{StaticResource FormField}"
+                                       ToolTip="Directory containing .pak / .utoc / .ucas files"/>
+                            <Button    Grid.Column="2" Content="Browse…" Margin="6,0,0,0"
+                                       Padding="8,3" VerticalAlignment="Center"
+                                       Click="BtnBrowsePak_Click"/>
+                        </Grid>
+
+                        <Grid Margin="0,0,0,10">
+                            <Grid.ColumnDefinitions>
+                                <ColumnDefinition Width="110"/>
+                                <ColumnDefinition Width="*"/>
+                            </Grid.ColumnDefinitions>
+                            <TextBlock Grid.Column="0" Text="AES key" Style="{StaticResource FormLabel}"/>
+                            <TextBox   Grid.Column="1" x:Name="TxtAesKey" Style="{StaticResource FormField}"
+                                       FontFamily="Consolas"
+                                       ToolTip="Hex AES key (leave blank if paks are not encrypted)"/>
+                        </Grid>
+
+                        <Grid Margin="0,0,0,10">
+                            <Grid.ColumnDefinitions>
+                                <ColumnDefinition Width="110"/>
+                                <ColumnDefinition Width="*"/>
+                                <ColumnDefinition Width="Auto"/>
+                            </Grid.ColumnDefinitions>
+                            <TextBlock Grid.Column="0" Text="Mappings (.usmap)" Style="{StaticResource FormLabel}"/>
+                            <TextBox   Grid.Column="1" x:Name="TxtUsmap" Style="{StaticResource FormField}"
+                                       ToolTip=".usmap mappings file for unversioned properties"/>
+                            <Button    Grid.Column="2" Content="Browse…" Margin="6,0,0,0"
+                                       Padding="8,3" VerticalAlignment="Center"
+                                       Click="BtnBrowseUsmap_Click"/>
+                        </Grid>
+
+                        <Grid Margin="0,0,0,20">
+                            <Grid.ColumnDefinitions>
+                                <ColumnDefinition Width="110"/>
+                                <ColumnDefinition Width="160"/>
+                            </Grid.ColumnDefinitions>
+                            <TextBlock Grid.Column="0" Text="UE version" Style="{StaticResource FormLabel}"/>
+                            <ComboBox  Grid.Column="1" x:Name="CmbVersion"
+                                       VerticalAlignment="Center"
+                                       ToolTip="Unreal Engine version of the target game"/>
+                        </Grid>
+
+                        <Separator Margin="0,0,0,16"/>
+
+                        <!-- Section: Preview -->
+                        <TextBlock Text="Preview" FontSize="14" FontWeight="SemiBold"
+                                   Margin="0,0,0,10"/>
+
+                        <CheckBox x:Name="ChkHeavyAssets" Margin="0,0,0,6"
+                                  Content="Load meshes, textures, sounds, animations, maps and materials"
+                                  FontSize="12"
+                                  ToolTip="When unchecked these asset types show a placeholder instead of loading JSON. Enabling this can be slow."/>
+
+                        <TextBlock FontSize="11" Foreground="#888" TextWrapping="Wrap"
+                                   Margin="20,0,0,20"
+                                   Text="Disable this if browsing is slow — heavy assets are expensive to deserialize and rarely need inspecting as raw JSON."/>
+
+                        <Separator Margin="0,0,0,16"/>
+
+                        <!-- Load button -->
+                        <StackPanel Orientation="Horizontal">
+                            <Button x:Name="BtnLoad" Content="Load pak files"
+                                    Width="130" Padding="8,6"
+                                    FontWeight="SemiBold" FontSize="13"
+                                    Click="BtnLoad_Click"/>
+                            <TextBlock x:Name="TxtLoadHint"
+                                       Text="Save settings and (re)load the pak directory."
+                                       FontSize="11" Foreground="#888"
+                                       VerticalAlignment="Center" Margin="12,0,0,0"/>
+                        </StackPanel>
+
+                    </StackPanel>
+                </ScrollViewer>
+            </TabItem>
+
+        </TabControl>
     </DockPanel>
 </Window>
