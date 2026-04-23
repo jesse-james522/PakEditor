@@ -39,23 +39,35 @@
             <Setter Property="Padding" Value="4,3"/>
             <Setter Property="FontSize" Value="12"/>
         </Style>
+
+        <Style x:Key="NoteText" TargetType="TextBlock">
+            <Setter Property="FontSize" Value="11"/>
+            <Setter Property="Foreground" Value="#888"/>
+            <Setter Property="TextWrapping" Value="Wrap"/>
+            <Setter Property="Margin" Value="20,2,0,10"/>
+        </Style>
     </Window.Resources>
 
     <DockPanel>
 
-        <!-- Status bar -->
+        <!-- Status bar (Load button lives here — always accessible) -->
         <Border DockPanel.Dock="Bottom" Background="#F0F0F0" BorderBrush="#CCCCCC"
                 BorderThickness="0,1,0,0" Padding="8,4">
             <Grid>
                 <Grid.ColumnDefinitions>
                     <ColumnDefinition Width="*"/>
-                    <ColumnDefinition Width="200"/>
+                    <ColumnDefinition Width="180"/>
+                    <ColumnDefinition Width="Auto"/>
                 </Grid.ColumnDefinitions>
                 <TextBlock x:Name="TxtStatus" Grid.Column="0" VerticalAlignment="Center"
                            Text="Ready" FontSize="11" Foreground="#555"/>
                 <ProgressBar x:Name="PrgLoad" Grid.Column="1" Height="10"
                              Minimum="0" Maximum="100" Value="0"
-                             Visibility="Collapsed" VerticalAlignment="Center"/>
+                             Visibility="Collapsed" VerticalAlignment="Center" Margin="0,0,8,0"/>
+                <Button x:Name="BtnLoad" Grid.Column="2"
+                        Content="Load" Width="64" Padding="4,3"
+                        FontWeight="SemiBold" FontSize="12"
+                        Click="BtnLoad_Click"/>
             </Grid>
         </Border>
 
@@ -86,7 +98,14 @@
                                   ItemTemplateSelector="{StaticResource NodeTemplateSelector}"
                                   ItemContainerStyle="{StaticResource TreeItemStyle}"
                                   SelectedItemChanged="AssetTree_SelectedItemChanged"
-                                  FontSize="12"/>
+                                  FontSize="12">
+                            <TreeView.ContextMenu>
+                                <ContextMenu>
+                                    <MenuItem Header="Open for editing"
+                                              Click="MenuOpenForEditing_Click"/>
+                                </ContextMenu>
+                            </TreeView.ContextMenu>
+                        </TreeView>
                     </DockPanel>
 
                     <GridSplitter Grid.Column="1" Width="4" HorizontalAlignment="Stretch"
@@ -140,18 +159,70 @@
                 </Grid>
             </TabItem>
 
+            <!-- ── Editor tab ─────────────────────────────────────────── -->
+            <TabItem Header="Editor" x:Name="TabEditor">
+                <Grid>
+                    <TextBlock x:Name="TxtEditorHint"
+                               Text="Right-click an asset in the Viewer and choose &quot;Open for editing&quot;."
+                               Foreground="#AAA" FontSize="13"
+                               HorizontalAlignment="Center" VerticalAlignment="Center"/>
+
+                    <Grid x:Name="EditorPanel" Visibility="Collapsed">
+                        <Grid.RowDefinitions>
+                            <RowDefinition Height="Auto"/>
+                            <RowDefinition Height="*"/>
+                            <RowDefinition Height="Auto"/>
+                        </Grid.RowDefinitions>
+
+                        <!-- Asset path + staged indicator -->
+                        <Border Grid.Row="0" Background="#FAFAFA" BorderBrush="#E0E0E0"
+                                BorderThickness="0,0,0,1" Padding="8,5">
+                            <Grid>
+                                <TextBlock x:Name="TxtEditorPath" FontSize="11" FontFamily="Consolas"
+                                           Foreground="#555" TextTrimming="CharacterEllipsis"
+                                           VerticalAlignment="Center"/>
+                                <TextBlock x:Name="TxtEditorStaging" Text="Staging…"
+                                           FontSize="11" Foreground="#999"
+                                           HorizontalAlignment="Right" VerticalAlignment="Center"
+                                           Visibility="Collapsed"/>
+                            </Grid>
+                        </Border>
+
+                        <!-- Property tree -->
+                        <TreeView x:Name="PropertyTree" Grid.Row="1"
+                                  FontFamily="Consolas" FontSize="12"
+                                  VirtualizingStackPanel.IsVirtualizing="True"
+                                  VirtualizingStackPanel.VirtualizationMode="Recycling"/>
+
+                        <!-- Save bar -->
+                        <Border Grid.Row="2" Background="#F0F0F0" BorderBrush="#E0E0E0"
+                                BorderThickness="0,1,0,0" Padding="8,5">
+                            <StackPanel Orientation="Horizontal">
+                                <Button x:Name="BtnSaveAsset" Content="Save changes"
+                                        Padding="10,4" FontWeight="SemiBold"
+                                        IsEnabled="False" Click="BtnSaveAsset_Click"/>
+                                <TextBlock x:Name="TxtDirtyIndicator"
+                                           Text="No unsaved changes" FontSize="11"
+                                           Foreground="#888" VerticalAlignment="Center"
+                                           Margin="12,0,0,0"/>
+                            </StackPanel>
+                        </Border>
+                    </Grid>
+                </Grid>
+            </TabItem>
+
             <!-- ── Settings tab ───────────────────────────────────────── -->
             <TabItem Header="Settings">
                 <ScrollViewer VerticalScrollBarVisibility="Auto">
-                    <StackPanel Margin="24,20" MaxWidth="600">
+                    <StackPanel Margin="24,20" MaxWidth="620">
 
-                        <!-- Section: Source -->
-                        <TextBlock Text="Source" FontSize="14" FontWeight="SemiBold"
+                        <!-- Section: Pak source -->
+                        <TextBlock Text="Pak source" FontSize="14" FontWeight="SemiBold"
                                    Margin="0,0,0,10"/>
 
                         <Grid Margin="0,0,0,10">
                             <Grid.ColumnDefinitions>
-                                <ColumnDefinition Width="110"/>
+                                <ColumnDefinition Width="120"/>
                                 <ColumnDefinition Width="*"/>
                                 <ColumnDefinition Width="Auto"/>
                             </Grid.ColumnDefinitions>
@@ -165,7 +236,7 @@
 
                         <Grid Margin="0,0,0,10">
                             <Grid.ColumnDefinitions>
-                                <ColumnDefinition Width="110"/>
+                                <ColumnDefinition Width="120"/>
                                 <ColumnDefinition Width="*"/>
                             </Grid.ColumnDefinitions>
                             <TextBlock Grid.Column="0" Text="AES key" Style="{StaticResource FormLabel}"/>
@@ -176,7 +247,7 @@
 
                         <Grid Margin="0,0,0,10">
                             <Grid.ColumnDefinitions>
-                                <ColumnDefinition Width="110"/>
+                                <ColumnDefinition Width="120"/>
                                 <ColumnDefinition Width="*"/>
                                 <ColumnDefinition Width="Auto"/>
                             </Grid.ColumnDefinitions>
@@ -188,9 +259,9 @@
                                        Click="BtnBrowseUsmap_Click"/>
                         </Grid>
 
-                        <Grid Margin="0,0,0,20">
+                        <Grid Margin="0,0,0,4">
                             <Grid.ColumnDefinitions>
-                                <ColumnDefinition Width="110"/>
+                                <ColumnDefinition Width="120"/>
                                 <ColumnDefinition Width="160"/>
                             </Grid.ColumnDefinitions>
                             <TextBlock Grid.Column="0" Text="UE version" Style="{StaticResource FormLabel}"/>
@@ -199,34 +270,59 @@
                                        ToolTip="Unreal Engine version of the target game"/>
                         </Grid>
 
-                        <Separator Margin="0,0,0,16"/>
+                        <TextBlock Style="{StaticResource NoteText}"
+                                   Text="Settings take effect when you click Load (bottom-right of the window)."/>
+
+                        <Separator Margin="0,8,0,16"/>
+
+                        <!-- Section: Loose files -->
+                        <TextBlock Text="Loose files" FontSize="14" FontWeight="SemiBold"
+                                   Margin="0,0,0,4"/>
+                        <TextBlock Style="{StaticResource NoteText}" Margin="0,0,0,8"
+                                   Text="Add individual .uasset files or folders of loose assets alongside the pak tree. Useful for modding overlay paks or testing edits before packing."/>
+
+                        <Grid Margin="0,0,0,6">
+                            <Grid.ColumnDefinitions>
+                                <ColumnDefinition Width="120"/>
+                                <ColumnDefinition Width="*"/>
+                                <ColumnDefinition Width="Auto"/>
+                                <ColumnDefinition Width="Auto"/>
+                            </Grid.ColumnDefinitions>
+                            <TextBlock Grid.Column="0" Text="Loose directory" Style="{StaticResource FormLabel}"/>
+                            <TextBox   Grid.Column="1" x:Name="TxtLooseDir" Style="{StaticResource FormField}"
+                                       ToolTip="Folder of loose .uasset / .umap files to include in the tree"/>
+                            <Button    Grid.Column="2" Content="Browse…" Margin="6,0,4,0"
+                                       Padding="8,3" VerticalAlignment="Center"
+                                       Click="BtnBrowseLooseDir_Click"/>
+                            <Button    Grid.Column="3" Content="Clear" Padding="8,3"
+                                       VerticalAlignment="Center"
+                                       Click="BtnClearLooseDir_Click"/>
+                        </Grid>
+
+                        <TextBlock Style="{StaticResource NoteText}"
+                                   Text="Loose files appear under a &#x22;Loose&#x22; root in the asset tree after clicking Load."/>
+
+                        <Separator Margin="0,8,0,16"/>
 
                         <!-- Section: Preview -->
                         <TextBlock Text="Preview" FontSize="14" FontWeight="SemiBold"
                                    Margin="0,0,0,10"/>
 
-                        <CheckBox x:Name="ChkHeavyAssets" Margin="0,0,0,6"
+                        <CheckBox x:Name="ChkHeavyAssets" Margin="0,0,0,4"
                                   Content="Load meshes, textures, sounds, animations, maps and materials"
                                   FontSize="12"
-                                  ToolTip="When unchecked these asset types show a placeholder instead of loading JSON. Enabling this can be slow."/>
+                                  ToolTip="When unchecked these asset types show a placeholder instead of loading JSON."/>
 
-                        <TextBlock FontSize="11" Foreground="#888" TextWrapping="Wrap"
-                                   Margin="20,0,0,20"
-                                   Text="Disable this if browsing is slow — heavy assets are expensive to deserialize and rarely need inspecting as raw JSON."/>
+                        <TextBlock Style="{StaticResource NoteText}"
+                                   Text="Disable this if browsing is slow — these assets are expensive to deserialize and rarely useful as raw JSON."/>
 
-                        <Separator Margin="0,0,0,16"/>
-
-                        <!-- Load button -->
-                        <StackPanel Orientation="Horizontal">
-                            <Button x:Name="BtnLoad" Content="Load pak files"
-                                    Width="130" Padding="8,6"
-                                    FontWeight="SemiBold" FontSize="13"
-                                    Click="BtnLoad_Click"/>
-                            <TextBlock x:Name="TxtLoadHint"
-                                       Text="Save settings and (re)load the pak directory."
-                                       FontSize="11" Foreground="#888"
-                                       VerticalAlignment="Center" Margin="12,0,0,0"/>
-                        </StackPanel>
+                        <Border Background="#FFF8E1" BorderBrush="#FFE082" BorderThickness="1"
+                                CornerRadius="3" Padding="10,7" Margin="0,0,0,16">
+                            <TextBlock FontSize="11" TextWrapping="Wrap" Foreground="#5D4037">
+                                <Run FontWeight="SemiBold">Note:</Run>
+                                <Run>Changing this setting only affects newly selected assets. To reload assets already in the preview, click Load again.</Run>
+                            </TextBlock>
+                        </Border>
 
                     </StackPanel>
                 </ScrollViewer>

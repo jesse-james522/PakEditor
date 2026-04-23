@@ -22,6 +22,7 @@ public class ProviderSettings
     public string MappingsPath { get; set; } = string.Empty;
     public EGame UeVersion { get; set; } = EGame.GAME_UE5_6;
     public bool PreviewHeavyAssets { get; set; } = false;
+    public string LooseDirectory { get; set; } = string.Empty;
 
     public static ProviderSettings Load()
     {

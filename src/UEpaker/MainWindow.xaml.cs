@@ -38,7 +38,6 @@ public partial class MainWindow : Window
             EGame.GAME_UE5_0,
         };
         CmbVersion.ItemsSource = versions;
-        CmbVersion.DisplayMemberPath = null;
         CmbVersion.SelectedItem = _settings.UeVersion;
         if (CmbVersion.SelectedItem is null) CmbVersion.SelectedIndex = 0;
     }
@@ -48,6 +47,7 @@ public partial class MainWindow : Window
         TxtPakDir.Text = _settings.PakDirectory;
         TxtAesKey.Text = _settings.AesKey;
         TxtUsmap.Text = _settings.MappingsPath;
+        TxtLooseDir.Text = _settings.LooseDirectory;
         CmbVersion.SelectedItem = _settings.UeVersion;
         ChkHeavyAssets.IsChecked = _settings.PreviewHeavyAssets;
     }
@@ -57,6 +57,7 @@ public partial class MainWindow : Window
         _settings.PakDirectory = TxtPakDir.Text.Trim();
         _settings.AesKey = TxtAesKey.Text.Trim();
         _settings.MappingsPath = TxtUsmap.Text.Trim();
+        _settings.LooseDirectory = TxtLooseDir.Text.Trim();
         _settings.UeVersion = CmbVersion.SelectedItem is EGame v ? v : EGame.GAME_UE5_6;
         _settings.PreviewHeavyAssets = ChkHeavyAssets.IsChecked == true;
         _settings.Save();
@@ -78,6 +79,18 @@ public partial class MainWindow : Window
         };
         if (dlg.ShowDialog() == true)
             TxtUsmap.Text = dlg.FileName;
+    }
+
+    private void BtnBrowseLooseDir_Click(object sender, RoutedEventArgs e)
+    {
+        var dlg = new OpenFolderDialog { Title = "Select loose files directory" };
+        if (dlg.ShowDialog() == true)
+            TxtLooseDir.Text = dlg.FolderName;
+    }
+
+    private void BtnClearLooseDir_Click(object sender, RoutedEventArgs e)
+    {
+        TxtLooseDir.Text = string.Empty;
     }
 
     // ── Load ─────────────────────────────────────────────────────────────────
@@ -109,9 +122,7 @@ public partial class MainWindow : Window
         _provider = new GameProvider();
 
         var progress = new Progress<(int Percent, string Message)>(p =>
-        {
-            SetStatus(p.Message, p.Percent);
-        });
+            SetStatus(p.Message, p.Percent));
 
         try
         {
@@ -127,11 +138,34 @@ public partial class MainWindow : Window
                 MessageBox.Show(warn, "Mappings warning", MessageBoxButton.OK, MessageBoxImage.Warning);
 
             SetStatus("Building asset tree…", 100);
+            var pakFiles = _provider.GetAllFiles();
+            var looseDir = _settings.LooseDirectory;
+
             _allRoots = await Task.Run(() =>
-                AssetTreeNode.BuildTree(_provider.GetAllFiles()), ct);
+            {
+                var roots = new List<AssetTreeNode>(
+                    AssetTreeNode.BuildTree(pakFiles));
+
+                if (!string.IsNullOrWhiteSpace(looseDir) && Directory.Exists(looseDir))
+                {
+                    var looseFiles = Directory.EnumerateFiles(looseDir, "*.*",
+                            SearchOption.AllDirectories)
+                        .Where(f => f.EndsWith(".uasset", StringComparison.OrdinalIgnoreCase)
+                                 || f.EndsWith(".umap", StringComparison.OrdinalIgnoreCase));
+
+                    var relativeFiles = looseFiles.Select(f =>
+                        "Loose/" + Path.GetRelativePath(looseDir, f).Replace('\\', '/'));
+
+                    var looseRoots = AssetTreeNode.BuildTree(relativeFiles);
+                    roots.InsertRange(0, looseRoots);
+                }
+
+                return (IReadOnlyList<AssetTreeNode>)roots;
+            }, ct);
 
             AssetTree.ItemsSource = _allRoots;
-            SetStatus($"Ready — {_provider.GetAllFiles().Count()} files loaded.", 100);
+            var fileCount = pakFiles.Count();
+            SetStatus($"Ready — {fileCount:N0} pak files loaded.", 100);
         }
         catch (OperationCanceledException)
         {
@@ -167,6 +201,12 @@ public partial class MainWindow : Window
             _ = ShowPreviewAsync(node);
         else
             ClearPreview();
+    }
+
+    private void MenuOpenForEditing_Click(object sender, RoutedEventArgs e)
+    {
+        if (AssetTree.SelectedItem is AssetTreeNode node && !node.IsFolder)
+            _ = OpenForEditingAsync(node);
     }
 
     // ── Search ────────────────────────────────────────────────────────────────
@@ -210,6 +250,13 @@ public partial class MainWindow : Window
 
         try
         {
+            // Loose files (prefixed "Loose/") are on disk — not in the pak provider
+            if (node.FullPath.StartsWith("Loose/", StringComparison.OrdinalIgnoreCase))
+            {
+                await ShowLooseFilePreviewAsync(node, ct);
+                return;
+            }
+
             var preview = await _provider!.LoadPreviewAsync(
                 node.FullPath, _settings.PreviewHeavyAssets, ct);
 
@@ -224,7 +271,8 @@ public partial class MainWindow : Window
                     break;
 
                 case PreviewResult.HeavyAsset:
-                    TxtPreviewHint.Text = "Heavy asset — enable \"Preview meshes/textures/sounds\" in settings to load.";
+                    TxtPreviewHint.Text =
+                        "Heavy asset — enable \"Load meshes, textures…\" in Settings to preview.";
                     TxtPreviewHint.Visibility = Visibility.Visible;
                     break;
 
@@ -255,6 +303,30 @@ public partial class MainWindow : Window
         }
     }
 
+    private async Task ShowLooseFilePreviewAsync(AssetTreeNode node, CancellationToken ct)
+    {
+        var looseDir = _settings.LooseDirectory;
+        var relPath = node.FullPath["Loose/".Length..].Replace('/', Path.DirectorySeparatorChar);
+        var diskPath = Path.Combine(looseDir, relPath);
+
+        if (!File.Exists(diskPath))
+        {
+            TxtPreviewHint.Text = $"File not found on disk: {diskPath}";
+            TxtPreviewHint.Visibility = Visibility.Visible;
+            TxtPreviewLoading.Visibility = Visibility.Collapsed;
+            return;
+        }
+
+        // Show raw hex summary for loose files — full editor via "Open for editing"
+        var size = new FileInfo(diskPath).Length;
+        TxtPreviewHint.Text =
+            $"Loose file — {size / 1024.0:F1} KB\n{diskPath}\n\nRight-click → Open for editing to inspect properties.";
+        TxtPreviewHint.Visibility = Visibility.Visible;
+        TxtPreviewLoading.Visibility = Visibility.Collapsed;
+
+        await Task.CompletedTask;
+    }
+
     private void ClearPreview()
     {
         _previewCts?.Cancel();
@@ -265,6 +337,67 @@ public partial class MainWindow : Window
         RtbJson.Document = new System.Windows.Documents.FlowDocument();
         ImportListBox.ItemsSource = null;
         TxtPreviewLoading.Visibility = Visibility.Collapsed;
+    }
+
+    // ── Editor ────────────────────────────────────────────────────────────────
+
+    private async Task OpenForEditingAsync(AssetTreeNode node)
+    {
+        MainTabs.SelectedItem = TabEditor;
+        TxtEditorHint.Visibility = Visibility.Collapsed;
+        EditorPanel.Visibility = Visibility.Visible;
+        TxtEditorPath.Text = node.FullPath;
+        TxtEditorStaging.Visibility = Visibility.Visible;
+        PropertyTree.ItemsSource = null;
+        BtnSaveAsset.IsEnabled = false;
+        TxtDirtyIndicator.Text = "Staging…";
+
+        try
+        {
+            var stagedPath = await AssetBridge.AssetStager.StageAsync(
+                node.FullPath,
+                _settings.LooseDirectory,
+                _settings.PakDirectory,
+                _provider,
+                _settings.UeVersion);
+
+            TxtEditorStaging.Visibility = Visibility.Collapsed;
+
+            var editorVm = Editor.AssetEditorVm.Load(stagedPath, _settings.UeVersion);
+            PropertyTree.ItemsSource = editorVm.Roots;
+            editorVm.DirtyChanged += dirty =>
+            {
+                BtnSaveAsset.IsEnabled = dirty;
+                TxtDirtyIndicator.Text = dirty ? "Unsaved changes" : "No unsaved changes";
+            };
+
+            TxtDirtyIndicator.Text = "No unsaved changes";
+            _currentEditorVm = editorVm;
+        }
+        catch (Exception ex)
+        {
+            TxtEditorStaging.Visibility = Visibility.Collapsed;
+            TxtEditorPath.Text = $"Error: {ex.Message}";
+            TxtDirtyIndicator.Text = "Failed to stage asset.";
+        }
+    }
+
+    private Editor.AssetEditorVm? _currentEditorVm;
+
+    private void BtnSaveAsset_Click(object sender, RoutedEventArgs e)
+    {
+        if (_currentEditorVm is null) return;
+        try
+        {
+            _currentEditorVm.Save();
+            TxtDirtyIndicator.Text = "Saved.";
+            BtnSaveAsset.IsEnabled = false;
+        }
+        catch (Exception ex)
+        {
+            MessageBox.Show($"Save failed: {ex.Message}", "UEpaker",
+                MessageBoxButton.OK, MessageBoxImage.Error);
+        }
     }
 
     // ── Helpers ───────────────────────────────────────────────────────────────

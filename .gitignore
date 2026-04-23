@@ -23,7 +23,7 @@ packages/
 *.sln.iml
 
 # Retoc binary (ship separately; not tracked in git)
-tools/retoc/retoc.exe
+tools/retoc/
 
 # Per-project staged working folder
 staged/
