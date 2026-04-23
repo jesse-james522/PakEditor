@@ -3,6 +3,9 @@ bin/
 obj/
 out/
 
+#Claude
+.Claude/
+
 # Visual Studio
 .vs/
 *.user
