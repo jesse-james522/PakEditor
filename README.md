@@ -1,4 +1,4 @@
-# PakEditor-FM
+# PakEditor
 
 A fork of [FModel](https://github.com/4sval/FModel) extended with an integrated asset editor and mod cooking pipeline for Unreal Engine games using IoStore (UE5) pak formats.
 
@@ -6,7 +6,7 @@ A fork of [FModel](https://github.com/4sval/FModel) extended with an integrated 
 
 ## What is this?
 
-PakEditor-FM lets you browse game archives with FModel's standard explorer, then directly edit `.uasset` files and cook them back into a loadable mod pak — all without leaving the application.
+PakEditor lets you browse game archives with FModel's standard explorer, then directly edit `.uasset` files and cook them back into a loadable mod pak — all without leaving the application.
 
 It bundles:
 - **FModel** — Unreal Engine archive explorer (CUE4Parse-based)
