@@ -1,0 +1,7 @@
+.vs
+docs
+packages
+TestResults
+UAssetGUI/bin
+UAssetGUI/obj
+UAssetGUI/git_commit.txt

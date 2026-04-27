@@ -1,6 +1,12 @@
-[submodule "libs/CUE4Parse"]
-	path = libs/CUE4Parse
+[submodule "CUE4Parse"]
+	path = CUE4Parse
 	url = https://github.com/FabianFG/CUE4Parse
-[submodule "libs/UAssetAPI"]
-	path = libs/UAssetAPI
+[submodule "UAssetAPI"]
+	path = UAssetAPI
 	url = https://github.com/atenfyr/UAssetAPI
+[submodule "UAssetGUI"]
+	path = UAssetGUI
+	url = https://github.com/atenfyr/UAssetGUI
+[submodule "Retoc"]
+	path = Retoc
+	url = https://github.com/trumank/retoc
