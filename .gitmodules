@@ -7,9 +7,6 @@
 [submodule "UAssetAPI"]
 	path = UAssetAPI
 	url = https://github.com/atenfyr/UAssetAPI
-[submodule "Fmodel"]
-	path = Fmodel
-	url = https://github.com/4sval/FModel
 [submodule "CUE4Parse"]
 	path = CUE4Parse
 	url = https://github.com/FabianFG/CUE4Parse
