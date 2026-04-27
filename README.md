@@ -188,7 +188,7 @@ Full license texts are in the `licenses\` folder of the distribution and in the 
 
 ## License
 
-PakEditor-FM (the FModel fork and all PakEditor additions) is licensed under the **GNU General Public License v3.0**.  
+PakEditor is licensed under the **GNU General Public License v3.0**.  
 See [LICENSE](LICENSE) for the full text.
 
 The bundled third-party tools (UAssetGUI, retoc) retain their own licenses — see `UAssetGUI\LICENSE` and `Retoc\LICENSE`.
