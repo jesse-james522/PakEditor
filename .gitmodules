@@ -1,12 +1,15 @@
-[submodule "CUE4Parse"]
-	path = CUE4Parse
-	url = https://github.com/FabianFG/CUE4Parse
-[submodule "UAssetAPI"]
-	path = UAssetAPI
-	url = https://github.com/atenfyr/UAssetAPI
-[submodule "UAssetGUI"]
-	path = UAssetGUI
-	url = https://github.com/atenfyr/UAssetGUI
 [submodule "Retoc"]
 	path = Retoc
 	url = https://github.com/trumank/retoc
+[submodule "UAssetGUI"]
+	path = UAssetGUI
+	url = https://github.com/atenfyr/UAssetGUI
+[submodule "UAssetAPI"]
+	path = UAssetAPI
+	url = https://github.com/atenfyr/UAssetAPI
+[submodule "Fmodel"]
+	path = Fmodel
+	url = https://github.com/4sval/FModel
+[submodule "CUE4Parse"]
+	path = CUE4Parse
+	url = https://github.com/FabianFG/CUE4Parse

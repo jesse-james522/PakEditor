@@ -8,7 +8,6 @@ namespace CUE4Parse.MappingsProvider
         private readonly StringComparer? _stringComparer;
         private readonly string _path;
         public readonly string FileName;
-        public string FilePath => _path;
 
         public FileUsmapTypeMappingsProvider(string path, StringComparer? comparer = null)
         {

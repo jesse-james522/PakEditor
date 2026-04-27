@@ -2324,12 +2324,6 @@ namespace UAssetAPI
         /// <returns>A byte array which represents the serialized binary data of the initial portion of the asset.</returns>
         private byte[] MakeHeader()
         {
-            // Ensure list/array fields that Read() normally initializes are never null
-            // when WriteData() is called on a programmatically-constructed UAsset.
-            if (Generations                == null) Generations                = new List<FGenerationInfo> { new FGenerationInfo(0, 0) };
-            if (AdditionalPackagesToCook   == null) AdditionalPackagesToCook   = new List<FString>();
-            if (ChunkIDs                   == null) ChunkIDs                   = Array.Empty<int>();
-
             var stre = new MemoryStream(this.NameOffset);
             AssetBinaryWriter writer = new AssetBinaryWriter(stre, this);
 
@@ -2365,7 +2359,7 @@ namespace UAssetAPI
 
             if (ObjectVersionUE5 >= ObjectVersionUE5.PACKAGE_SAVED_HASH)
             {
-                writer.Write(SavedHash ?? new byte[20]);
+                writer.Write(SavedHash);
                 writer.Write(SectionSixOffset);
             }
 
@@ -2556,10 +2550,6 @@ namespace UAssetAPI
         public virtual MemoryStream WriteData()
         {
             isSerializationTime = true;
-
-            // Ensure fields populated by Read() are never null for programmatically-built assets.
-            if (AssetRegistryRecords == null) { AssetRegistryRecords = []; doWeHaveAssetRegistryData = false; }
-            if (WorldTileInfo        == null)   doWeHaveWorldTileInfo = false;
 
             // resolve ancestries
             ResolveAncestries();
