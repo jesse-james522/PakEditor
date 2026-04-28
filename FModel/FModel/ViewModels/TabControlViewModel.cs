@@ -156,6 +156,14 @@ public class TabItem : ViewModel
         }
     }
 
+    private string _editFilePath;
+    public string EditFilePath
+    {
+        get => _editFilePath;
+        set { SetProperty(ref _editFilePath, value); RaisePropertyChanged(nameof(IsReadOnly)); }
+    }
+    public bool IsReadOnly => _editFilePath is null;
+
     private bool _hasSearchOpen;
     public bool HasSearchOpen
     {
@@ -280,6 +288,7 @@ public class TabItem : ViewModel
         TitleExtra = string.Empty;
         ParentExportType = string.Empty;
         ScrollTrigger = null;
+        EditFilePath = null;
         Application.Current.Dispatcher.Invoke(() =>
         {
             _images.Clear();

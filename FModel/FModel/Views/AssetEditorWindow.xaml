@@ -124,7 +124,7 @@
                         IsEnabled="False"
                         Click="BtnSave_Click"/>
                 <Button x:Name="BtnOpenExternal"
-                        Content="Open in Branch View"
+                        Content="Open in UAssetGUI"
                         Padding="12,4" Margin="8,0,0,0"
                         Click="BtnOpenExternal_Click"/>
                 <TextBlock x:Name="TxtStatus"

@@ -545,13 +545,5 @@ namespace FModel.Settings
             set => SetProperty(ref _previewTexturesAssetExplorer, value);
         }
 
-        // ── PakEditor ──────────────────────────────────────────────────────────
-
-        private EAssetEditorMode _assetEditorMode = EAssetEditorMode.BranchView;
-        public EAssetEditorMode AssetEditorMode
-        {
-            get => _assetEditorMode;
-            set => SetProperty(ref _assetEditorMode, value);
-        }
     }
 }

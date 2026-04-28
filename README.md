@@ -1,4 +1,4 @@
-# PakEditor
+# PakEditor-FM
 
 A fork of [FModel](https://github.com/4sval/FModel) extended with an integrated asset editor and mod cooking pipeline for Unreal Engine games using IoStore (UE5) pak formats.
 
@@ -6,7 +6,7 @@ A fork of [FModel](https://github.com/4sval/FModel) extended with an integrated 
 
 ## What is this?
 
-PakEditor lets you browse game archives with FModel's standard explorer, then directly edit `.uasset` files and cook them back into a loadable mod pak — all without leaving the application.
+PakEditor-FM lets you browse game archives with FModel's standard explorer, then directly edit `.uasset` files and cook them back into a loadable mod pak — all without leaving the application.
 
 It bundles:
 - **FModel** — Unreal Engine archive explorer (CUE4Parse-based)
@@ -91,12 +91,12 @@ Output lands in `publish\release\` or `publish\debug\`.
 
 1. In the archive browser, right-click any `.uasset` → **Edit Asset**.
 2. The Asset Editor opens. PakEditor:
-   - Extracts the asset from the IoStore container via retoc to a temp staging folder.
+   - Extracts the asset from the IoStore container via retoc directly into `EditedAssets\<game-path>\`.
    - Loads it with UAssetAPI and shows a hierarchical property tree.
 3. Expand exports to view and edit property values inline.
-4. Click **Save Changes** to write edits back to the staged file.
+4. Click **Save Changes** to write edits back to the file in `EditedAssets\`.
 
-> Staged files live in `%TEMP%\PakEditor\Staged\`. They are cached — re-opening the same asset skips re-extraction.
+> If the file already exists in `EditedAssets\`, it is reused as-is — your prior edits are never overwritten.
 
 ---
 
@@ -104,7 +104,7 @@ Output lands in `publish\release\` or `publish\debug\`.
 
 1. From the Asset Editor, click **Open in UAssetGUI**.
 2. PakEditor will:
-   - Copy the asset to `EditedAssets\<game-path>\` (never overwrites an existing file).
+   - Open the file from `EditedAssets\<game-path>\` (extracting it first if it's not there yet).
    - Copy your game's `.usmap` mappings file into `UAssetGUI\Data\Mappings\`.
    - Write the engine version to `UAssetGUI\Data\config.json` (portable mode).
    - Launch UAssetGUI with the file, engine version and mappings name as CLI arguments.
@@ -155,17 +155,14 @@ A: At least one asset must be checked. Click **✓ All** or check individual box
 **Q: retoc failed / exit code non-zero.**  
 A: Make sure `Retoc\retoc.exe` is present. Check that the engine version in FModel Settings matches your game. The full retoc error is shown in the status bar.
 
-**Q: Asset Editor shows "retoc failed" during staging.**  
+**Q: Asset Editor shows "retoc failed" during extraction.**  
 A: Verify your AES key is loaded and your Game Directory points to the correct Paks folder.
 
 **Q: UAssetGUI shows "failed to maintain binary equality".**  
 A: This is a UAssetAPI limitation for that specific asset type. The asset may still be editable — check the [UAssetAPI issues](https://github.com/atenfyr/UAssetAPI/issues) page.
 
-**Q: Where are staged files stored?**  
-A: `%TEMP%\PakEditor\Staged\` — delete this folder to force a fresh extract on next open.
-
 **Q: Where are edited files stored?**  
-A: `EditedAssets\` next to the exe, mirroring the game's virtual path (e.g. `EditedAssets\Game\Content\...`).
+A: `EditedAssets\` next to the exe, mirroring the game's virtual path (e.g. `EditedAssets\Game\Content\...`). Delete a file there to force a fresh extract on next open.
 
 ---
 
@@ -188,7 +185,7 @@ Full license texts are in the `licenses\` folder of the distribution and in the 
 
 ## License
 
-PakEditor is licensed under the **GNU General Public License v3.0**.  
+PakEditor-FM (the FModel fork and all PakEditor additions) is licensed under the **GNU General Public License v3.0**.  
 See [LICENSE](LICENSE) for the full text.
 
 The bundled third-party tools (UAssetGUI, retoc) retain their own licenses — see `UAssetGUI\LICENSE` and `Retoc\LICENSE`.

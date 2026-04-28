@@ -7,6 +7,7 @@ using System.Threading;
 using System.Windows;
 using CUE4Parse.FileProvider.Objects;
 using CUE4Parse.Utils;
+using FModel.Extensions;
 using FModel.Framework;
 using FModel.Services;
 using FModel.Settings;
@@ -57,19 +58,46 @@ public class RightClickMenuCommand : ViewModelCommand<ApplicationViewModel>
         if (folders.Length == 0 && assets.Length == 0)
             return;
 
-        // ── Edit Asset: open editor window on the UI thread ────────────────────
-        if (trigger == "Assets_Edit_Asset")
+        // ── Edit Data submenu ─────────────────────────────────────────────────
+        if (trigger is "Assets_Edit_Json" or "Assets_Edit_UAssetGUI" or "Assets_Edit_BranchView")
         {
             var asset = assets.FirstOrDefault();
             if (asset is null) return;
-            Application.Current.Dispatcher.Invoke(() =>
+
+            if (trigger == "Assets_Edit_Json")
             {
-                var win = new AssetEditorWindow(asset, contextViewModel.CUE4Parse.Provider)
+                var tabControl = contextViewModel.CUE4Parse.TabControl;
+                var provider   = contextViewModel.CUE4Parse.Provider;
+                Application.Current.Dispatcher.Invoke(() =>
                 {
-                    Owner = Application.Current.MainWindow
-                };
-                win.Show();
-            });
+                    tabControl.AddTab(asset.NameWithoutExtension + " · JSON");
+                    var tab = tabControl.SelectedTab;
+                    tab.Highlighter = AvalonExtensions.HighlighterSelector("json");
+                    tab.SetDocumentText("// Loading…", false, false);
+
+                    _ = AssetEditorWindow.ExtractAndLoadJsonAsync(
+                        asset, provider,
+                        (editPath, json) => Application.Current.Dispatcher.Invoke(() =>
+                        {
+                            tab.SetDocumentText(json, false, false);
+                            tab.EditFilePath = editPath;
+                        }),
+                        error => Application.Current.Dispatcher.Invoke(() =>
+                            tab.SetDocumentText($"// Error: {error}", false, false)));
+                });
+            }
+            else
+            {
+                Application.Current.Dispatcher.Invoke(() =>
+                {
+                    var autoLaunchUAssetGui = trigger == "Assets_Edit_UAssetGUI";
+                    var win = new AssetEditorWindow(asset, contextViewModel.CUE4Parse.Provider, autoLaunchUAssetGui)
+                    {
+                        Owner = Application.Current.MainWindow
+                    };
+                    win.Show();
+                });
+            }
             return;
         }
 

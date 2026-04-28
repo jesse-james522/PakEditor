@@ -165,8 +165,3 @@ public enum EAssetCategory : uint
         DeltaForce = GameSpecific + 4,
 }
 
-public enum EAssetEditorMode
-{
-    BranchView, // open in UAssetGUI
-    JsonEditor, // built-in JSON editor
-}

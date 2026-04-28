@@ -26,23 +26,25 @@ public partial class AssetEditorWindow : AdonisUI.Controls.AdonisWindow
 {
     private readonly GameFile                _gf;
     private readonly AbstractVfsFileProvider _provider;
+    private readonly bool                    _autoLaunchUAssetGui;
 
     private UAsset? _asset;
     private string? _editPath;
     private bool    _isDirty;
 
     // Persistent edit folder — files here survive across sessions and are never re-extracted if present.
-    private static readonly string EditRoot =
+    internal static readonly string EditRoot =
         Path.Combine(AppContext.BaseDirectory, "EditedAssets");
 
     // Place UAssetGUI.exe here.
     private static readonly string UAssetGuiExe =
         Path.Combine(AppContext.BaseDirectory, "UAssetGUI", "UAssetGUI.exe");
 
-    public AssetEditorWindow(GameFile gf, AbstractVfsFileProvider provider)
+    public AssetEditorWindow(GameFile gf, AbstractVfsFileProvider provider, bool autoLaunchUAssetGui = false)
     {
-        _gf       = gf;
-        _provider = provider;
+        _gf                  = gf;
+        _provider            = provider;
+        _autoLaunchUAssetGui = autoLaunchUAssetGui;
         InitializeComponent();
         TxtPath.Text = gf.Path;
     }
@@ -51,9 +53,6 @@ public partial class AssetEditorWindow : AdonisUI.Controls.AdonisWindow
 
     private void OnLoaded(object sender, RoutedEventArgs e)
     {
-        BtnOpenExternal.Content = UserSettings.Default.AssetEditorMode == EAssetEditorMode.JsonEditor
-            ? "Open in JSON Editor"
-            : "Open in Branch View";
         _ = InitAsync();
     }
 
@@ -94,6 +93,13 @@ public partial class AssetEditorWindow : AdonisUI.Controls.AdonisWindow
 
             BuildTree();
             TxtLoading.Visibility = Visibility.Collapsed;
+
+            if (_autoLaunchUAssetGui)
+            {
+                await OpenInBranchViewAsync();
+                return;
+            }
+
             SetStatus(loadWarning != null
                 ? $"⚠ {loadWarning} — some exports may be missing."
                 : "Expand exports to view and edit properties. Save writes back to EditedAssets.");
@@ -266,24 +272,7 @@ public partial class AssetEditorWindow : AdonisUI.Controls.AdonisWindow
     // ── Open in UAssetGUI ─────────────────────────────────────────────────────
 
     private async void BtnOpenExternal_Click(object sender, RoutedEventArgs e)
-    {
-        if (UserSettings.Default.AssetEditorMode == EAssetEditorMode.JsonEditor)
-            OpenJsonEditor();
-        else
-            await OpenInBranchViewAsync();
-    }
-
-    private void OpenJsonEditor()
-    {
-        if (_asset is null || _editPath is null)
-        {
-            SetStatus("Asset not loaded yet.");
-            return;
-        }
-        var win = new JsonEditorWindow(_editPath, _asset) { Owner = this };
-        win.Show();
-        SetStatus("JSON editor opened.");
-    }
+        => await OpenInBranchViewAsync();
 
     private async Task OpenInBranchViewAsync()
     {
@@ -499,4 +488,93 @@ public partial class AssetEditorWindow : AdonisUI.Controls.AdonisWindow
         EGame.GAME_UE4_25 => "UE4_25",
         _                 => "UE5_6",
     };
+
+    // ── Static JSON extraction helper (used by RightClickMenuCommand) ─────────
+
+    public static Task ExtractAndLoadJsonAsync(
+        GameFile gf,
+        AbstractVfsFileProvider provider,
+        Action<string, string> onSuccess,
+        Action<string> onError)
+    {
+        return Task.Run(async () =>
+        {
+            var editPath = Path.Combine(EditRoot, gf.Path.Replace('/', Path.DirectorySeparatorChar));
+            try
+            {
+                if (!IsValidAssetFile(editPath))
+                {
+                    await ExtractStaticAsync(gf, provider, editPath);
+                    if (!IsValidAssetFile(editPath))
+                    {
+                        onError("Extraction failed — asset not found after retoc.");
+                        return;
+                    }
+                }
+
+                var ev    = MapEGame(provider.Versions.Game);
+                var usmap = GetUsmapStatic(provider);
+                string json = null;
+                var asset = new UAsset(editPath, ev, mappings: usmap);
+                json = asset.SerializeJson(true);
+                onSuccess(editPath, json);
+            }
+            catch (Exception ex)
+            {
+                onError(ex.Message);
+            }
+        });
+    }
+
+    private static async Task ExtractStaticAsync(GameFile gf, AbstractVfsFileProvider provider, string editPath)
+    {
+        IReadOnlyDictionary<string, byte[]>? dict = null;
+        await Task.Run(() => provider.TrySavePackage(gf, out dict));
+
+        if (dict is not null && dict.Count > 0)
+        {
+            foreach (var (key, bytes) in dict)
+            {
+                if (!key.EndsWith(".uasset", StringComparison.OrdinalIgnoreCase) &&
+                    !key.EndsWith(".umap",   StringComparison.OrdinalIgnoreCase))
+                    continue;
+
+                uint magic = bytes.Length >= 4 ? BitConverter.ToUInt32(bytes, 0) : 0;
+                if (magic != UAsset.UASSET_MAGIC)
+                    break;
+
+                foreach (var (k, b) in dict)
+                {
+                    var dest = Path.Combine(EditRoot, k.Replace('/', Path.DirectorySeparatorChar));
+                    Directory.CreateDirectory(Path.GetDirectoryName(dest)!);
+                    await File.WriteAllBytesAsync(dest, b);
+                }
+                return;
+            }
+        }
+
+        // IoStore path via retoc
+        var paksDir = UserSettings.Default.CurrentDir.GameDirectory;
+        var aesKey  = UserSettings.Default.CurrentDir.AesKeys?.MainKey;
+        var version = MapEGameToRetocVersion(provider.Versions.Game);
+        var filter  = Path.ChangeExtension(gf.Path, null);
+
+        Directory.CreateDirectory(EditRoot);
+        await RetocService.ToLegacyAsync(
+            input:         paksDir,
+            outputDir:     EditRoot,
+            aesKey:        aesKey,
+            engineVersion: version,
+            filter:        filter);
+    }
+
+    private static Usmap? GetUsmapStatic(AbstractVfsFileProvider provider)
+    {
+        if (provider.MappingsContainer is FileUsmapTypeMappingsProvider fp)
+        {
+            try { return new Usmap(fp.FilePath); }
+            catch { }
+        }
+        return null;
+    }
 }

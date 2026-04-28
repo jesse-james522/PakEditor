@@ -5,13 +5,7 @@
                     xmlns:converters="clr-namespace:FModel.Views.Resources.Converters">
     <ContextMenu x:Key="FileContextMenu" x:Shared="False"
                  DataContext="{Binding DataContext, RelativeSource={RelativeSource AncestorType=Window}}">
-        <MenuItem Header="Edit Asset" Command="{Binding RightClickMenuCommand}">
-            <MenuItem.CommandParameter>
-                <MultiBinding Converter="{x:Static converters:MultiParameterConverter.Instance}">
-                    <Binding Source="Assets_Edit_Asset" />
-                    <Binding Path="PlacementTarget.SelectedItems" RelativeSource="{RelativeSource AncestorType=ContextMenu}" />
-                </MultiBinding>
-            </MenuItem.CommandParameter>
+        <MenuItem Header="Edit Data">
             <MenuItem.IsEnabled>
                 <Binding Path="PlacementTarget.SelectedItems" RelativeSource="{RelativeSource AncestorType=ContextMenu}">
                     <Binding.Converter>
@@ -30,6 +24,30 @@
                     </Canvas>
                 </Viewbox>
             </MenuItem.Icon>
+            <MenuItem Header="Edit with JSON" Command="{Binding RightClickMenuCommand}">
+                <MenuItem.CommandParameter>
+                    <MultiBinding Converter="{x:Static converters:MultiParameterConverter.Instance}">
+                        <Binding Source="Assets_Edit_Json" />
+                        <Binding Path="PlacementTarget.SelectedItems" RelativeSource="{RelativeSource AncestorType=ContextMenu}" />
+                    </MultiBinding>
+                </MenuItem.CommandParameter>
+            </MenuItem>
+            <MenuItem Header="Edit with UAssetGUI" Command="{Binding RightClickMenuCommand}">
+                <MenuItem.CommandParameter>
+                    <MultiBinding Converter="{x:Static converters:MultiParameterConverter.Instance}">
+                        <Binding Source="Assets_Edit_UAssetGUI" />
+                        <Binding Path="PlacementTarget.SelectedItems" RelativeSource="{RelativeSource AncestorType=ContextMenu}" />
+                    </MultiBinding>
+                </MenuItem.CommandParameter>
+            </MenuItem>
+            <MenuItem Header="Edit with Prototype Branch View" Command="{Binding RightClickMenuCommand}">
+                <MenuItem.CommandParameter>
+                    <MultiBinding Converter="{x:Static converters:MultiParameterConverter.Instance}">
+                        <Binding Source="Assets_Edit_BranchView" />
+                        <Binding Path="PlacementTarget.SelectedItems" RelativeSource="{RelativeSource AncestorType=ContextMenu}" />
+                    </MultiBinding>
+                </MenuItem.CommandParameter>
+            </MenuItem>
         </MenuItem>
         <Separator />
         <MenuItem Header="Extract in New Tab" Command="{Binding RightClickMenuCommand}">

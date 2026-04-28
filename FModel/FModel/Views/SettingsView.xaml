@@ -540,41 +540,6 @@
                               Style="{DynamicResource {x:Static adonisUi:Styles.ToggleSwitch}}" Margin="0 5 0 5"/>
                 </Grid>
             </DataTemplate>
-            <DataTemplate x:Key="PakEditorTemplate">
-                <Grid adonisExtensions:LayerExtension.Layer="2">
-                    <Grid.RowDefinitions>
-                        <RowDefinition Height="Auto" />
-                        <RowDefinition Height="Auto" />
-                        <RowDefinition Height="Auto" />
-                    </Grid.RowDefinitions>
-                    <Grid.ColumnDefinitions>
-                        <ColumnDefinition Width="Auto" />
-                        <ColumnDefinition Width="10" />
-                        <ColumnDefinition Width="*" />
-                    </Grid.ColumnDefinitions>
-
-                    <TextBlock Grid.Row="0" Grid.Column="0" Text="Asset Editor Mode" VerticalAlignment="Center" Margin="0 0 0 5"
-                               ToolTip="Chooses what opens when you click the secondary editor button in the Asset Editor." />
-                    <StackPanel Grid.Row="0" Grid.Column="2" Orientation="Horizontal" Margin="0 0 0 5">
-                        <RadioButton Content="Branch View (UAssetGUI)" VerticalAlignment="Center" Margin="0 0 12 0"
-                                     IsChecked="{Binding AssetEditorMode, Source={x:Static local:Settings.UserSettings.Default},
-                                                 Converter={x:Static converters:EnumToBoolConverter.Instance},
-                                                 ConverterParameter=BranchView, Mode=TwoWay}" />
-                        <RadioButton Content="JSON Editor" VerticalAlignment="Center"
-                                     IsChecked="{Binding AssetEditorMode, Source={x:Static local:Settings.UserSettings.Default},
-                                                 Converter={x:Static converters:EnumToBoolConverter.Instance},
-                                                 ConverterParameter=JsonEditor, Mode=TwoWay}" />
-                    </StackPanel>
-
-                    <Separator Grid.Row="1" Grid.Column="0" Grid.ColumnSpan="3" Style="{StaticResource CustomSeparator}" />
-
-                    <TextBlock Grid.Row="2" Grid.Column="0" Grid.ColumnSpan="3"
-                               Text="Branch View requires UAssetGUI\UAssetGUI.exe next to PakEditor.exe."
-                               FontSize="10" Foreground="{DynamicResource {x:Static adonisUi:Brushes.DisabledForegroundBrush}}"
-                               TextWrapping="Wrap" />
-                </Grid>
-            </DataTemplate>
-
             <DataTemplate x:Key="KeybindingsTemplate">
                 <Grid adonisExtensions:LayerExtension.Layer="2">
                     <Grid.RowDefinitions>
@@ -701,19 +666,6 @@
                             </Canvas>
                         </Viewbox>
                         <TextBlock Text="Models" HorizontalAlignment="Left" VerticalAlignment="Center" />
-                    </StackPanel>
-                </TreeViewItem.Header>
-            </TreeViewItem>
-            <TreeViewItem Tag="PakEditorTemplate">
-                <TreeViewItem.Header>
-                    <StackPanel Orientation="Horizontal">
-                        <Viewbox Width="16" Height="16" HorizontalAlignment="Center" Margin="-20 4 7.5 4">
-                            <Canvas Width="24" Height="24">
-                                <Path Fill="{DynamicResource {x:Static adonisUi:Brushes.AccentForegroundBrush}}"
-                                      Data="M3 3h18v2H3V3zm0 4h12v2H3V7zm0 4h18v2H3v-2zm0 4h12v2H3v-2zm0 4h18v2H3v-2z" />
-                            </Canvas>
-                        </Viewbox>
-                        <TextBlock Text="PakEditor" HorizontalAlignment="Left" VerticalAlignment="Center" />
                     </StackPanel>
                 </TreeViewItem.Header>
             </TreeViewItem>

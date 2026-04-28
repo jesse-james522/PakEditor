@@ -11,6 +11,7 @@ using FModel.Services;
 using FModel.ViewModels;
 using ICSharpCode.AvalonEdit;
 using SkiaSharp;
+using UAssetAPI;
 
 namespace FModel.Views.Resources.Controls;
 
@@ -55,6 +56,13 @@ public partial class AvalonEditor
         {
             case Key.Escape:
                 ((TabItem) DataContext).HasSearchOpen = false;
+                break;
+            case Key.S when Keyboard.Modifiers == ModifierKeys.Control:
+                if (DataContext is TabItem { IsReadOnly: false, EditFilePath: { } editPath })
+                {
+                    SaveEditedJson(editPath);
+                    e.Handled = true;
+                }
                 break;
             case Key.Enter when !Keyboard.Modifiers.HasFlag(ModifierKeys.Shift) && ((TabItem) DataContext).HasSearchOpen:
                 FindNext();
@@ -222,6 +230,22 @@ public partial class AvalonEditor
     private void OnCloseClick(object sender, RoutedEventArgs e)
     {
         ((TabItem) DataContext).HasSearchOpen = false;
+    }
+
+    private void SaveEditedJson(string editPath)
+    {
+        try
+        {
+            var patch = UAsset.DeserializeJson(MyAvalonEditor.Document.Text);
+            patch.Write(editPath);
+            if (DataContext is TabItem tab)
+                tab.TitleExtra = "saved";
+        }
+        catch (Exception ex)
+        {
+            MessageBox.Show($"Save failed: {ex.Message}", "JSON Save Error",
+                MessageBoxButton.OK, MessageBoxImage.Error);
+        }
     }
 
     private void OnTabClose(object sender, EventArgs eventArgs)

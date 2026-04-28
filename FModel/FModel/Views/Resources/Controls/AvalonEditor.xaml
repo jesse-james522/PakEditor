@@ -104,7 +104,7 @@
         </Grid>
 
         <avalonEdit:TextEditor x:Name="MyAvalonEditor" Grid.Row="0" Grid.RowSpan="2" SyntaxHighlighting="{Binding Highlighter}" Document="{Binding Document}"
-                               FontFamily="Consolas" FontSize="{Binding FontSize}" IsReadOnly="True" ShowLineNumbers="True" Foreground="#DAE5F2"
+                               FontFamily="Consolas" FontSize="{Binding FontSize}" IsReadOnly="{Binding IsReadOnly}" ShowLineNumbers="True" Foreground="#DAE5F2"
                                Background="{DynamicResource {x:Static adonisUi:Brushes.Layer3BackgroundBrush}}" PreviewMouseWheel="OnPreviewMouseWheel"
                                TextChanged="OnTextChanged" MouseHover="OnMouseHover" MouseHoverStopped="OnMouseHoverStopped" PreviewMouseUp="OnMouseRelease" />
     </Grid>
