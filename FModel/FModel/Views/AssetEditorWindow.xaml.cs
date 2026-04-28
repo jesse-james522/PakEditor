@@ -67,7 +67,10 @@ public partial class AssetEditorWindow : AdonisUI.Controls.AdonisWindow
         {
             if (IsValidAssetFile(_editPath))
             {
-                SetStatus("Using existing edited file…");
+                // Apply any pending JSON sidecar edits before loading.
+                var (ok, err) = TryApplyJsonSidecar(_editPath);
+                if (!ok) SetStatus($"⚠ JSON→uasset conversion failed: {err}");
+                else     SetStatus("Using existing edited file…");
             }
             else
             {
@@ -294,6 +297,16 @@ public partial class AssetEditorWindow : AdonisUI.Controls.AdonisWindow
             }
         }
 
+        // Flush any JSON edits before launching the external tool.
+        var (sidecarOk, sidecarErr) = TryApplyJsonSidecar(_editPath!);
+        if (!sidecarOk)
+        {
+            var proceed = MessageBox.Show(
+                $"JSON→.uasset conversion failed:\n{sidecarErr}\n\nOpen Branch View anyway (with stale .uasset)?",
+                "Conversion Warning", MessageBoxButton.YesNo, MessageBoxImage.Warning);
+            if (proceed != MessageBoxResult.Yes) return;
+        }
+
         TryWriteUAssetGuiConfig();
 
         var versionStr = GetShortVersionString(_provider.Versions.Game);
@@ -449,7 +462,33 @@ public partial class AssetEditorWindow : AdonisUI.Controls.AdonisWindow
         catch { return false; }
     }
 
-    private static EngineVersion MapEGame(EGame game) => game switch
+    // ── JSON sidecar helpers ──────────────────────────────────────────────────
+
+    /// <summary>
+    /// If a JSON sidecar (.uasset.json) exists alongside the asset, convert it
+    /// back to binary .uasset.  Returns (true, null) on success or no sidecar.
+    /// </summary>
+    public static (bool Ok, string? Error) TryApplyJsonSidecar(string editPath)
+    {
+        var jsonPath = editPath + ".json";
+        if (!File.Exists(jsonPath)) return (true, null);
+
+        try
+        {
+            var json  = File.ReadAllText(jsonPath);
+            var patch = UAsset.DeserializeJson(json);
+            patch.Write(editPath);
+            return (true, null);
+        }
+        catch (Exception ex)
+        {
+            return (false, ex.Message);
+        }
+    }
+
+    // ── Engine version mapping ────────────────────────────────────────────────
+
+    public static EngineVersion MapEGame(EGame game) => game switch
     {
         EGame.GAME_UE5_6 or EGame.GAME_UE5_7 => EngineVersion.VER_UE5_6,
         EGame.GAME_UE5_5  => EngineVersion.VER_UE5_5,

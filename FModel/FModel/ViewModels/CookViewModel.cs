@@ -10,6 +10,7 @@ using System.Windows;
 using System.Windows.Forms;
 using CUE4Parse.UE4.Versions;
 using FModel.Settings;
+using FModel.Views;
 using PakEditor.Packer;
 
 namespace FModel.ViewModels;
@@ -187,6 +188,20 @@ public class CookViewModel : INotifyPropertyChanged
         if (string.IsNullOrEmpty(name)) name = "MyMod_P";
 
         IsCooking = true;
+        Status    = "Flushing JSON sidecar edits…";
+
+        // Convert any pending JSON sidecar → .uasset before staging.
+        await Task.Run(() =>
+        {
+            foreach (var item in selected)
+            {
+                var (ok, err) = AssetEditorWindow.TryApplyJsonSidecar(item.FullPath);
+                if (!ok)
+                    System.Windows.Application.Current.Dispatcher.Invoke(() =>
+                        Status = $"⚠ {item.FileName}: JSON→uasset failed: {err}");
+            }
+        });
+
         Status    = "Preparing staging directory…";
 
         var stagingDir = Path.Combine(Path.GetTempPath(), "PakEditor", "CookStaging",

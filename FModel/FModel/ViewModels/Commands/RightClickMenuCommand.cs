@@ -79,6 +79,9 @@ public class RightClickMenuCommand : ViewModelCommand<ApplicationViewModel>
                         asset, provider,
                         (editPath, json) => Application.Current.Dispatcher.Invoke(() =>
                         {
+                            // Persist the initial JSON as a sidecar so Ctrl+S
+                            // and cook can always find the latest version on disk.
+                            try { System.IO.File.WriteAllText(editPath + ".json", json); } catch { }
                             tab.SetDocumentText(json, false, false);
                             tab.EditFilePath = editPath;
                         }),

@@ -1,5 +1,6 @@
 using System;
 using System.Collections.Generic;
+using System.IO;
 using System.Text.RegularExpressions;
 using System.Windows;
 using System.Windows.Input;
@@ -11,7 +12,6 @@ using FModel.Services;
 using FModel.ViewModels;
 using ICSharpCode.AvalonEdit;
 using SkiaSharp;
-using UAssetAPI;
 
 namespace FModel.Views.Resources.Controls;
 
@@ -234,26 +234,42 @@ public partial class AvalonEditor
 
     private void SaveEditedJson(string editPath)
     {
-        try
-        {
-            var patch = UAsset.DeserializeJson(MyAvalonEditor.Document.Text);
-            patch.Write(editPath);
-            if (DataContext is TabItem tab)
-                tab.TitleExtra = "saved";
-        }
+        var text     = MyAvalonEditor.Document?.Text ?? string.Empty;
+        var jsonPath = editPath + ".json";
+
+        // Always persist JSON to sidecar (never loses edits).
+        try { File.WriteAllText(jsonPath, text); }
         catch (Exception ex)
         {
-            MessageBox.Show($"Save failed: {ex.Message}", "JSON Save Error",
+            MessageBox.Show($"JSON sidecar write failed: {ex.Message}", "Save Error",
                 MessageBoxButton.OK, MessageBoxImage.Error);
+            return;
         }
+
+        // Attempt binary conversion.
+        var (ok, error) = FModel.Views.AssetEditorWindow.TryApplyJsonSidecar(editPath);
+        if (DataContext is TabItem tab)
+            tab.TitleExtra = ok ? "saved" : "json saved";
+
+        if (!ok)
+            MessageBox.Show($"JSON saved, but .uasset conversion failed:\n{error}",
+                "Conversion Warning", MessageBoxButton.OK, MessageBoxImage.Warning);
     }
 
     private void OnTabClose(object sender, EventArgs eventArgs)
     {
-        if (eventArgs is not TabControlViewModel.TabEventArgs e || e.TabToRemove.Document?.FileName is not { } fileName)
-            return;
+        if (eventArgs is not TabControlViewModel.TabEventArgs e) return;
+        var closingTab = e.TabToRemove;
 
-        if (_savedCarets.ContainsKey(fileName))
+        // If this tab has a JSON edit path, persist sidecar and attempt conversion.
+        if (closingTab.EditFilePath is { } editPath && closingTab.Document?.Text is { } text)
+        {
+            var jsonPath = editPath + ".json";
+            try { File.WriteAllText(jsonPath, text); } catch { }
+            FModel.Views.AssetEditorWindow.TryApplyJsonSidecar(editPath);
+        }
+
+        if (closingTab.Document?.FileName is { } fileName && _savedCarets.ContainsKey(fileName))
             _savedCarets.Remove(fileName);
     }
 
