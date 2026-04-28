@@ -1,7 +1,7 @@
 # PakEditor-FM
 
 A fork of [FModel](https://github.com/4sval/FModel) extended with an integrated asset editor and mod cooking pipeline for Unreal Engine games using IoStore (UE5) pak formats.
-
+Made by pretzel3819(DiscordID)
 ---
 
 ## What is this?
