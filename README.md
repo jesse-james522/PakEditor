@@ -1,7 +1,7 @@
 # PakEditor-FM
 
 A fork of [FModel](https://github.com/4sval/FModel) extended with an integrated asset editor and mod cooking pipeline for Unreal Engine games using IoStore (UE5) pak formats.
-
+Made by pretzel3819(DiscordID)
 ---
 
 ## What is this?
@@ -56,11 +56,12 @@ Requirements: .NET 9 SDK, Visual Studio 2022 (or Rider), Git.
 
 ```powershell
 # Clone with submodules
-git clone --recurse-submodules https://github.com/YourUser/PakEditor-FM.git
-cd PakEditor-FM
+git clone --recurse-submodules https://github.com/jesse-james522/PakEditor.git
+cd PakEditor
 
-# Place UAssetGUI.exe (v1.0.4+) in the UAssetGUI\ folder
+# Place UAssetGUI.exe (v1.0.4+ for UE5.5+) in the UAssetGUI/ folder
 # Download from: https://github.com/atenfyr/UAssetGUI/releases
+# Download and place Retoc in Retoc/ as well from https://github.com/trumank/retoc/releases 
 
 # Release build (self-contained, no runtime needed)
 .\build-release.bat
@@ -159,7 +160,7 @@ A: Make sure `Retoc\retoc.exe` is present. Check that the engine version in FMod
 A: Verify your AES key is loaded and your Game Directory points to the correct Paks folder.
 
 **Q: UAssetGUI shows "failed to maintain binary equality".**  
-A: This is a UAssetAPI limitation for that specific asset type. The asset may still be editable — check the [UAssetAPI issues](https://github.com/atenfyr/UAssetAPI/issues) page.
+A: This is a UAssetAPI limitation for that specific asset type. The asset may still be editable — check the [UAssetAPI issues](https://github.com/atenfyr/UAssetAPI/issues) page. It may also be an issue on your computer, clear configs and reinstall UassetGUI.
 
 **Q: Where are edited files stored?**  
 A: `EditedAssets\` next to the exe, mirroring the game's virtual path (e.g. `EditedAssets\Game\Content\...`). Delete a file there to force a fresh extract on next open.
