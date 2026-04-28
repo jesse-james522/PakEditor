@@ -1,23 +1,28 @@
 #Requires -Version 5.1
 <#
 .SYNOPSIS
-    Builds PakEditor-FM and assembles the full distributable output.
+    Builds PakEditor and assembles the full distributable output.
 
 .PARAMETER Configuration
     Build configuration: Debug or Release (default: Release)
+
+.PARAMETER Version
+    Version tag for the output zip, e.g. "1.0-a2" (default: "1.0")
 
 .PARAMETER NoPause
     Skip the pause at the end (useful for CI)
 
 .EXAMPLE
     .\build.ps1
-    .\build.ps1 -Configuration Debug
+    .\build.ps1 -Version 1.0-a2
+    .\build.ps1 -Configuration Debug -Version 1.0-a2
     .\build.ps1 -Configuration Release -NoPause
 #>
 
 param(
     [ValidateSet('Debug','Release')]
     [string]$Configuration = 'Release',
+    [string]$Version = '1.0',
     [switch]$NoPause
 )
 
@@ -26,7 +31,7 @@ $ErrorActionPreference = 'Stop'
 
 $root   = $PSScriptRoot
 $out    = Join-Path $root "publish\$($Configuration.ToLower())"
-$fmodel = Join-Path $root "FModel"
+$fmodel = Join-Path $root "FModel\FModel"
 
 function Copy-IfExists([string]$src, [string]$dst) {
     if (Test-Path $src) {
@@ -44,10 +49,10 @@ function Copy-IfExists([string]$src, [string]$dst) {
 # -------------------------------------------------------------------------
 Write-Host ""
 Write-Host "================================================================" -ForegroundColor Cyan
-Write-Host "  PakEditor-FM  --  $Configuration build"                        -ForegroundColor Cyan
+Write-Host "  PakEditor  --  $Configuration build  (v$Version)"               -ForegroundColor Cyan
 Write-Host "================================================================" -ForegroundColor Cyan
 Write-Host ""
-Write-Host "Step 1/4  Building ($Configuration)..." -ForegroundColor Yellow
+Write-Host "Step 1/5  Building ($Configuration)..." -ForegroundColor Yellow
 
 Push-Location $fmodel
 try {
@@ -75,7 +80,7 @@ Write-Host "  Build OK -> $out" -ForegroundColor Green
 # Step 2 - Bundle UAssetGUI (portable, v1.0.4+)
 # -------------------------------------------------------------------------
 Write-Host ""
-Write-Host "Step 2/4  Bundling UAssetGUI..." -ForegroundColor Yellow
+Write-Host "Step 2/5  Bundling UAssetGUI..." -ForegroundColor Yellow
 
 $uagSrc = Join-Path $root "UAssetGUI"
 $uagDst = Join-Path $out  "UAssetGUI"
@@ -94,7 +99,7 @@ if (!(Test-Path (Join-Path $uagDst "UAssetGUI.exe"))) {
 # Step 3 - Bundle retoc
 # -------------------------------------------------------------------------
 Write-Host ""
-Write-Host "Step 3/4  Bundling retoc..." -ForegroundColor Yellow
+Write-Host "Step 3/5  Bundling retoc..." -ForegroundColor Yellow
 
 $retocSrc = Join-Path $root "Retoc"
 $retocDst = Join-Path $out  "Retoc"
@@ -108,7 +113,7 @@ Copy-IfExists (Join-Path $retocSrc "README.md")   (Join-Path $retocDst "README.m
 # Step 4 - Copy docs and licenses
 # -------------------------------------------------------------------------
 Write-Host ""
-Write-Host "Step 4/4  Copying docs and licenses..." -ForegroundColor Yellow
+Write-Host "Step 4/5  Copying docs and licenses..." -ForegroundColor Yellow
 
 Copy-IfExists (Join-Path $root "README.md") (Join-Path $out "README.md")
 Copy-IfExists (Join-Path $root "LICENSE")   (Join-Path $out "LICENSE")
@@ -137,6 +142,20 @@ Copy-IfExists (Join-Path $root "CUE4Parse\NOTICE")     (Join-Path $licDst "NOTIC
 Copy-IfExists (Join-Path $root "Retoc\LICENSE")        (Join-Path $licDst "MIT-retoc.txt")
 
 # -------------------------------------------------------------------------
+# Step 5 - Create versioned zip
+# -------------------------------------------------------------------------
+Write-Host ""
+Write-Host "Step 5/5  Creating versioned zip..." -ForegroundColor Yellow
+
+$zipName = "PakEditor-$Version.zip"
+$zipPath = Join-Path $root "publish\$zipName"
+
+if (Test-Path $zipPath) { Remove-Item $zipPath -Force }
+
+Compress-Archive -Path "$out\*" -DestinationPath $zipPath -CompressionLevel Optimal
+Write-Host "  Zipped  -> $zipPath" -ForegroundColor Green
+
+# -------------------------------------------------------------------------
 # Done
 # -------------------------------------------------------------------------
 
@@ -153,13 +172,14 @@ if (!(Test-Path $oodle)) {
 Write-Host ""
 Write-Host "================================================================" -ForegroundColor Green
 Write-Host "  Done!  Output: $out"                                           -ForegroundColor Green
+Write-Host "  Zip:    $zipPath"                                              -ForegroundColor Green
 Write-Host "================================================================" -ForegroundColor Green
 Write-Host ""
 Write-Host "  PakEditor.exe          main application"
 Write-Host "  UAssetGUI\             portable UAssetGUI (v1.0.4+)"
 Write-Host "  Retoc\                 retoc IoStore converter"
 Write-Host "  README.md              user guide"
-Write-Host "  LICENSE / NOTICE       PakEditor-FM (GPL-3)"
+Write-Host "  LICENSE / NOTICE       PakEditor (GPL-3)"
 Write-Host "  licenses\              all third-party license texts"
 Write-Host ""
 

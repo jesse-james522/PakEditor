@@ -159,12 +159,13 @@ public class CurveViewModel : ViewModelBase
 
     public void LoadColorCurve(UCurveLinearColor curve, string assetName)
     {
+        var fc = curve.FloatCurves;
         var channels = new (string Label, OxyColor Color, FRichCurve? Curve)[]
         {
-            ("R", OxyColor.FromRgb(220, 60,  60),  curve.FloatCurves[0]),
-            ("G", OxyColor.FromRgb(60,  200, 60),  curve.FloatCurves[1]),
-            ("B", OxyColor.FromRgb(60,  120, 220), curve.FloatCurves[2]),
-            ("A", OxyColor.FromRgb(160, 160, 160), curve.FloatCurves[3]),
+            ("R", OxyColor.FromRgb(220, 60,  60),  fc.Length > 0 ? fc[0] : null),
+            ("G", OxyColor.FromRgb(60,  200, 60),  fc.Length > 1 ? fc[1] : null),
+            ("B", OxyColor.FromRgb(60,  120, 220), fc.Length > 2 ? fc[2] : null),
+            ("A", OxyColor.FromRgb(160, 160, 160), fc.Length > 3 ? fc[3] : null),
         };
         var raw = new List<RawSeries>();
         foreach (var (label, color, richCurve) in channels)
