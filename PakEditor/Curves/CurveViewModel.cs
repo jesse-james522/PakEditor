@@ -5,6 +5,7 @@ using System.Globalization;
 using System.IO;
 using System.Linq;
 using System.Windows;
+using System.Windows.Threading;
 using CUE4Parse.UE4.Assets.Exports.Engine;
 using CUE4Parse.UE4.Assets.Objects;
 using CUE4Parse.UE4.Objects.Engine.Curves;
@@ -136,6 +137,9 @@ public class CurveViewModel : ViewModelBase
     private List<RawSeries> _rawSeries        = new();
     private string          _currentAssetName = string.Empty;
 
+    // ── Rebuild debounce (50 ms) ──────────────────────────────────────────────
+    private DispatcherTimer? _rebuildTimer;
+
     // ── Construction ──────────────────────────────────────────────────────────
     public CurveViewModel()
     {
@@ -222,7 +226,7 @@ public class CurveViewModel : ViewModelBase
         var entry = MakeEntry(value);
         Multipliers.Add(entry);
         Persist();
-        RebuildPlot();
+        ScheduleRebuild();
     }
 
     /// <summary>Remove a multiplier row. Called by the ✕ button.</summary>
@@ -231,15 +235,35 @@ public class CurveViewModel : ViewModelBase
         if (Multipliers.Count <= 1) return; // always keep at least one
         Multipliers.Remove(entry);
         Persist();
-        RebuildPlot();
+        ScheduleRebuild();
     }
 
     // ── Internal helpers ──────────────────────────────────────────────────────
 
+    /// <summary>
+    /// Debounced rebuild: coalesces rapid toggles/edits into a single redraw
+    /// after 50 ms of idle, preventing janky multi-rebuild during quick clicks.
+    /// Must be called on the UI thread.
+    /// </summary>
+    private void ScheduleRebuild()
+    {
+        if (_rebuildTimer == null)
+        {
+            _rebuildTimer = new DispatcherTimer(DispatcherPriority.Background)
+            {
+                Interval = TimeSpan.FromMilliseconds(50),
+            };
+            _rebuildTimer.Tick += (_, _) => { _rebuildTimer.Stop(); RebuildPlot(); };
+        }
+        // Reset the countdown on every call so only the last change triggers a rebuild.
+        _rebuildTimer.Stop();
+        _rebuildTimer.Start();
+    }
+
     private MultiplierEntry MakeEntry(double value)
     {
         var e = new MultiplierEntry { Value = value };
-        e.OnChanged = () => { Persist(); RebuildPlot(); };
+        e.OnChanged = () => { Persist(); ScheduleRebuild(); };
         return e;
     }
 
@@ -255,7 +279,7 @@ public class CurveViewModel : ViewModelBase
             ? sm
             : new List<double> { 1.0 };
 
-        Application.Current.Dispatcher.Invoke(() =>
+        _ = Application.Current.Dispatcher.InvokeAsync(() =>
         {
             // ── Series ──
             AvailableSeries.Clear();
@@ -267,7 +291,7 @@ public class CurveViewModel : ViewModelBase
                     Color     = s.Color,
                     IsEnabled = enabledSet == null || enabledSet.Contains(s.Label),
                 };
-                info.OnToggled = () => { Persist(); RebuildPlot(); };
+                info.OnToggled = () => { Persist(); ScheduleRebuild(); };
                 AvailableSeries.Add(info);
             }
 
@@ -353,6 +377,8 @@ public class CurveViewModel : ViewModelBase
 
                 var scatter = new ScatterSeries
                 {
+                    Title                 = title,
+                    TrackerFormatString   = $"{title}\nt={{2:F3}}  v={{4:F4}}",
                     MarkerType            = MarkerType.Circle,
                     MarkerSize            = lineStyle == LineStyle.Solid ? 4 : 3,
                     MarkerFill            = si.Color,
@@ -360,8 +386,7 @@ public class CurveViewModel : ViewModelBase
                     MarkerStrokeThickness = 1,
                 };
                 foreach (var k in rawEntry.Keys)
-                    scatter.Points.Add(new ScatterPoint(k.Time, k.Value * m, tag:
-                        $"{title}\nt={k.Time:F3}  v={k.Value * m:F4}  {k.InterpMode}"));
+                    scatter.Points.Add(new ScatterPoint(k.Time, k.Value * m));
                 model.Series.Add(scatter);
             }
         }

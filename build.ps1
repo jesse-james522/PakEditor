@@ -22,12 +22,17 @@
 param(
     [ValidateSet('Debug','Release')]
     [string]$Configuration = 'Release',
-    [string]$Version = '1.0',
+    [string]$Version = '',
     [switch]$NoPause
 )
 
 Set-StrictMode -Version Latest
 $ErrorActionPreference = 'Stop'
+
+if ($Configuration -eq 'Release' -and [string]::IsNullOrWhiteSpace($Version)) {
+    $input = Read-Host "Version tag for zip (e.g. 1.0-a2) [1.0]"
+    $Version = if ([string]::IsNullOrWhiteSpace($input)) { '1.0' } else { $input.Trim() }
+}
 
 $root   = $PSScriptRoot
 $out    = Join-Path $root "publish\$($Configuration.ToLower())"
@@ -142,18 +147,23 @@ Copy-IfExists (Join-Path $root "CUE4Parse\NOTICE")     (Join-Path $licDst "NOTIC
 Copy-IfExists (Join-Path $root "Retoc\LICENSE")        (Join-Path $licDst "MIT-retoc.txt")
 
 # -------------------------------------------------------------------------
-# Step 5 - Create versioned zip
+# Step 5 - Create versioned zip  (Release only)
 # -------------------------------------------------------------------------
 Write-Host ""
-Write-Host "Step 5/5  Creating versioned zip..." -ForegroundColor Yellow
+if ($Configuration -eq 'Debug') {
+    Write-Host "Step 5/5  Skipping zip (Debug build)." -ForegroundColor DarkGray
+    $zipPath = $null
+} else {
+    Write-Host "Step 5/5  Creating versioned zip..." -ForegroundColor Yellow
 
-$zipName = "PakEditor-$Version.zip"
-$zipPath = Join-Path $root "publish\$zipName"
+    $zipName = "PakEditor-$Version.zip"
+    $zipPath = Join-Path $root "publish\$zipName"
 
-if (Test-Path $zipPath) { Remove-Item $zipPath -Force }
+    if (Test-Path $zipPath) { Remove-Item $zipPath -Force }
 
-Compress-Archive -Path "$out\*" -DestinationPath $zipPath -CompressionLevel Optimal
-Write-Host "  Zipped  -> $zipPath" -ForegroundColor Green
+    Compress-Archive -Path "$out\*" -DestinationPath $zipPath -CompressionLevel Optimal
+    Write-Host "  Zipped  -> $zipPath" -ForegroundColor Green
+}
 
 # -------------------------------------------------------------------------
 # Done
@@ -172,7 +182,9 @@ if (!(Test-Path $oodle)) {
 Write-Host ""
 Write-Host "================================================================" -ForegroundColor Green
 Write-Host "  Done!  Output: $out"                                           -ForegroundColor Green
-Write-Host "  Zip:    $zipPath"                                              -ForegroundColor Green
+if ($zipPath) {
+    Write-Host "  Zip:    $zipPath"                                          -ForegroundColor Green
+}
 Write-Host "================================================================" -ForegroundColor Green
 Write-Host ""
 Write-Host "  PakEditor.exe          main application"

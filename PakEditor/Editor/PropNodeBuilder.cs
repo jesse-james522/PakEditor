@@ -262,8 +262,15 @@ public static class PropNodeBuilder
             case "TextProperty":
             {
                 var p = (TextPropertyData)pd;
-                var display = p.Value?.ToString() ?? p.CultureInvariantString?.ToString() ?? string.Empty;
-                return (display, null);
+                // CultureInvariantString is the source/display text; Value is the string-table key for Base history.
+                var display = p.CultureInvariantString?.ToString() ?? p.Value?.ToString() ?? string.Empty;
+                return (display, s =>
+                {
+                    if (p.CultureInvariantString != null)
+                        p.CultureInvariantString = new FString(s);
+                    else
+                        p.Value = new FString(s);
+                });
             }
             case "EnumProperty":
             {
@@ -293,7 +300,25 @@ public static class PropNodeBuilder
             case "SoftObjectProperty":
             {
                 var p = (SoftObjectPropertyData)pd;
-                return (p.Value.AssetPath.PackageName?.ToString() ?? string.Empty, null);
+                var pkg   = p.Value.AssetPath.PackageName?.ToString() ?? string.Empty;
+                var aName = p.Value.AssetPath.AssetName?.ToString()   ?? string.Empty;
+                var display = aName.Length > 0 ? $"{pkg}.{aName}" : pkg;
+                return (display, s =>
+                {
+                    var dot = s.LastIndexOf('.');
+                    FName pkgFn, assetFn;
+                    if (dot > 0)
+                    {
+                        pkgFn   = FName.FromString(asset, s[..dot]);
+                        assetFn = FName.FromString(asset, s[(dot + 1)..]);
+                    }
+                    else
+                    {
+                        pkgFn   = FName.FromString(asset, s);
+                        assetFn = p.Value.AssetPath.AssetName;
+                    }
+                    p.Value = new FSoftObjectPath(pkgFn, assetFn, p.Value.SubPathString);
+                });
             }
             case "RichCurveKey":
             {

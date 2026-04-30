@@ -144,7 +144,12 @@ public class FModelApiEndpoint : AbstractApiProvider
 
             const string message = "A new update is available!";
             Log.Warning("{message} Version {CurrentVersion} ({Hash})", message, currentVersion, targetHash);
-            Helper.OpenWindow<AdonisWindow>(message, () => new UpdateView { Title = message, ResizeMode = ResizeMode.NoResize }.ShowDialog());
+
+            // Show PakEditor-specific warning so users know updating removes fork features.
+            var warning = new PakEditorUpdateWarning();
+            warning.ShowDialog();
+            if (warning.ShouldUpdate)
+                Helper.OpenWindow<AdonisWindow>(message, () => new UpdateView { Title = message, ResizeMode = ResizeMode.NoResize }.ShowDialog());
         }
         else
         {

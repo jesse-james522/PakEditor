@@ -1,7 +1,6 @@
 using System.ComponentModel;
 using System.Windows;
 using System.Windows.Controls;
-using System.Windows.Data;
 using System.Windows.Input;
 using System.Windows.Media;
 using OxyPlot;
@@ -22,7 +21,7 @@ public partial class CurveView : UserControl
         {
             Background             = Brushes.Transparent,
             MinHeight              = 80,
-            DefaultTrackerTemplate = BuildDarkTrackerTemplate(),
+            DefaultTrackerTemplate = (ControlTemplate)Resources["FModelTrackerTemplate"],
             Controller             = BuildSafeController(),
         };
         PlotHost.Content = _plotView;
@@ -30,33 +29,7 @@ public partial class CurveView : UserControl
         DataContextChanged += OnDataContextChanged;
     }
 
-    // ── Tracker + controller ─────────────────────────────────────────────────
-
-    private static ControlTemplate BuildDarkTrackerTemplate()
-    {
-        var textFactory = new FrameworkElementFactory(typeof(TextBlock));
-        textFactory.SetBinding(TextBlock.TextProperty, new Binding("Text"));
-        textFactory.SetValue(TextBlock.ForegroundProperty,
-            new SolidColorBrush(Color.FromRgb(0xD4, 0xD4, 0xD4)));
-        textFactory.SetValue(TextBlock.FontSizeProperty, 11.0);
-        textFactory.SetValue(TextBlock.LineHeightProperty, 16.0);
-        textFactory.SetValue(TextBlock.TextWrappingProperty, TextWrapping.NoWrap);
-
-        var borderFactory = new FrameworkElementFactory(typeof(Border));
-        borderFactory.SetValue(Border.BackgroundProperty,
-            new SolidColorBrush(Color.FromArgb(0xEE, 0x1E, 0x1E, 0x2E)));
-        borderFactory.SetValue(Border.BorderBrushProperty,
-            new SolidColorBrush(Color.FromArgb(0xFF, 0x4A, 0x90, 0xD9)));
-        borderFactory.SetValue(Border.BorderThicknessProperty, new Thickness(1));
-        borderFactory.SetValue(Border.CornerRadiusProperty, new CornerRadius(3));
-        borderFactory.SetValue(Border.PaddingProperty, new Thickness(8, 4, 8, 4));
-        borderFactory.AppendChild(textFactory);
-
-        var template = new ControlTemplate(typeof(TrackerControl));
-        template.VisualTree = borderFactory;
-        template.Seal();
-        return template;
-    }
+    // ── Controller ───────────────────────────────────────────────────────────
 
     private static PlotController BuildSafeController()
     {
@@ -94,8 +67,10 @@ public partial class CurveView : UserControl
                 case nameof(CurveViewModel.Headline):
                     HeadlineText.Text = vm.Headline;
                     break;
+                case nameof(CurveViewModel.IsVisible):
+                    UpdateControlBar(vm);
+                    break;
             }
-            UpdateControlBar(vm);
         });
     }
 
@@ -108,15 +83,11 @@ public partial class CurveView : UserControl
 
     private void UpdateControlBar(CurveViewModel vm)
     {
-        // Show control bar whenever a curve is loaded (always has ≥1 multiplier).
-        ControlBar.Visibility = vm.IsVisible ? Visibility.Visible : Visibility.Collapsed;
+        ControlBar.Visibility    = vm.IsVisible ? Visibility.Visible : Visibility.Collapsed;
+        SeriesSection.Visibility = vm.AvailableSeries.Count > 1 ? Visibility.Visible : Visibility.Collapsed;
 
-        // Series section: only useful when there are multiple series to toggle.
-        SeriesSection.Visibility = vm.AvailableSeries.Count > 1
-            ? Visibility.Visible : Visibility.Collapsed;
-
-        if (SeriesList.ItemsSource   != vm.AvailableSeries)  SeriesList.ItemsSource   = vm.AvailableSeries;
-        if (MultiplierList.ItemsSource != vm.Multipliers)     MultiplierList.ItemsSource = vm.Multipliers;
+        if (SeriesList.ItemsSource    != vm.AvailableSeries) SeriesList.ItemsSource    = vm.AvailableSeries;
+        if (MultiplierList.ItemsSource != vm.Multipliers)    MultiplierList.ItemsSource = vm.Multipliers;
     }
 
     // ── Multiplier button handlers ───────────────────────────────────────────
@@ -132,16 +103,12 @@ public partial class CurveView : UserControl
 
     private void OnMultiplierEntryKeyDown(object sender, KeyEventArgs e)
     {
-        if (e.Key is Key.Enter or Key.Return)
+        if (e.Key is not (Key.Enter or Key.Return)) return;
+        if (sender is TextBox tb)
         {
-            // Force the binding to commit then move focus away.
-            if (sender is TextBox tb)
-            {
-                var binding = tb.GetBindingExpression(TextBox.TextProperty);
-                binding?.UpdateSource();
-                Keyboard.ClearFocus();
-            }
-            e.Handled = true;
+            tb.GetBindingExpression(TextBox.TextProperty)?.UpdateSource();
+            Keyboard.ClearFocus();
         }
+        e.Handled = true;
     }
 }
