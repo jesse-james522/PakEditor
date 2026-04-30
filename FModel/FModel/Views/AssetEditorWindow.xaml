@@ -5,8 +5,8 @@
         xmlns:adonisControls="clr-namespace:AdonisUI.Controls;assembly=AdonisUI"
         xmlns:adonisExtensions="clr-namespace:AdonisUI.Extensions;assembly=AdonisUI"
         Title="Asset Editor"
-        Width="1000" Height="680"
-        MinWidth="600" MinHeight="360"
+        Width="1200" Height="680"
+        MinWidth="800" MinHeight="360"
         WindowStartupLocation="CenterOwner"
         IconVisibility="Collapsed"
         Loaded="OnLoaded">
@@ -43,19 +43,28 @@
                 BorderThickness="0,0,0,1" Padding="22,3,8,3">
             <Grid>
                 <Grid.ColumnDefinitions>
-                    <ColumnDefinition Width="230"/>
-                    <ColumnDefinition Width="130"/>
+                    <ColumnDefinition Width="180"/>
+                    <ColumnDefinition Width="110"/>
+                    <ColumnDefinition Width="90"/>
+                    <ColumnDefinition Width="110"/>
+                    <ColumnDefinition Width="80"/>
+                    <ColumnDefinition Width="80"/>
+                    <ColumnDefinition Width="80"/>
+                    <ColumnDefinition Width="50"/>
+                    <ColumnDefinition Width="80"/>
+                    <ColumnDefinition Width="50"/>
                     <ColumnDefinition Width="*"/>
                 </Grid.ColumnDefinitions>
-                <TextBlock Grid.Column="0" Text="Name"
-                           FontFamily="Consolas" FontSize="10" FontWeight="SemiBold"
-                           Foreground="{DynamicResource {x:Static adonisUi:Brushes.DisabledForegroundBrush}}"/>
-                <TextBlock Grid.Column="1" Text="Type"
-                           FontFamily="Consolas" FontSize="10" FontWeight="SemiBold"
-                           Foreground="{DynamicResource {x:Static adonisUi:Brushes.DisabledForegroundBrush}}"/>
-                <TextBlock Grid.Column="2" Text="Value"
-                           FontFamily="Consolas" FontSize="10" FontWeight="SemiBold"
-                           Foreground="{DynamicResource {x:Static adonisUi:Brushes.DisabledForegroundBrush}}"/>
+                <TextBlock Grid.Column="0"  Text="Name"        FontFamily="Consolas" FontSize="10" FontWeight="SemiBold" Foreground="{DynamicResource {x:Static adonisUi:Brushes.DisabledForegroundBrush}}"/>
+                <TextBlock Grid.Column="1"  Text="Type"        FontFamily="Consolas" FontSize="10" FontWeight="SemiBold" Foreground="{DynamicResource {x:Static adonisUi:Brushes.DisabledForegroundBrush}}" Padding="4,0,0,0"/>
+                <TextBlock Grid.Column="2"  Text="Variant"     FontFamily="Consolas" FontSize="10" FontWeight="SemiBold" Foreground="{DynamicResource {x:Static adonisUi:Brushes.DisabledForegroundBrush}}" Padding="4,0,0,0"/>
+                <TextBlock Grid.Column="3"  Text="Value 1"     FontFamily="Consolas" FontSize="10" FontWeight="SemiBold" Foreground="{DynamicResource {x:Static adonisUi:Brushes.DisabledForegroundBrush}}" Padding="4,0,0,0"/>
+                <TextBlock Grid.Column="4"  Text="Value 2"     FontFamily="Consolas" FontSize="10" FontWeight="SemiBold" Foreground="{DynamicResource {x:Static adonisUi:Brushes.DisabledForegroundBrush}}" Padding="4,0,0,0"/>
+                <TextBlock Grid.Column="5"  Text="Value 3"     FontFamily="Consolas" FontSize="10" FontWeight="SemiBold" Foreground="{DynamicResource {x:Static adonisUi:Brushes.DisabledForegroundBrush}}" Padding="4,0,0,0"/>
+                <TextBlock Grid.Column="6"  Text="Value 4"     FontFamily="Consolas" FontSize="10" FontWeight="SemiBold" Foreground="{DynamicResource {x:Static adonisUi:Brushes.DisabledForegroundBrush}}" Padding="4,0,0,0"/>
+                <TextBlock Grid.Column="7"  Text="Idx"         FontFamily="Consolas" FontSize="10" FontWeight="SemiBold" Foreground="{DynamicResource {x:Static adonisUi:Brushes.DisabledForegroundBrush}}" Padding="4,0,0,0"/>
+                <TextBlock Grid.Column="8"  Text="Offset"      FontFamily="Consolas" FontSize="10" FontWeight="SemiBold" Foreground="{DynamicResource {x:Static adonisUi:Brushes.DisabledForegroundBrush}}" Padding="4,0,0,0"/>
+                <TextBlock Grid.Column="9"  Text="Zero"        FontFamily="Consolas" FontSize="10" FontWeight="SemiBold" Foreground="{DynamicResource {x:Static adonisUi:Brushes.DisabledForegroundBrush}}" Padding="4,0,0,0"/>
             </Grid>
         </Border>
 
@@ -66,7 +75,16 @@
                   VirtualizingStackPanel.IsVirtualizing="True"
                   VirtualizingStackPanel.VirtualizationMode="Recycling"
                   BorderThickness="0"
-                  Background="{DynamicResource {x:Static adonisUi:Brushes.Layer0BackgroundBrush}}">
+                  Background="{DynamicResource {x:Static adonisUi:Brushes.Layer0BackgroundBrush}}"
+                  ContextMenuOpening="PropTree_ContextMenuOpening">
+
+            <TreeView.ContextMenu>
+                <ContextMenu x:Name="PropContextMenu">
+                    <MenuItem x:Name="MenuAddElement"       Header="Add element"       Click="AddArrayElement_Click"/>
+                    <MenuItem x:Name="MenuRemoveElement"    Header="Remove element"    Click="RemoveArrayElement_Click"/>
+                    <MenuItem x:Name="MenuDuplicateElement" Header="Duplicate element" Click="DuplicateArrayElement_Click"/>
+                </ContextMenu>
+            </TreeView.ContextMenu>
 
             <TreeView.ItemContainerStyle>
                 <Style TargetType="TreeViewItem" BasedOn="{StaticResource {x:Type TreeViewItem}}">
@@ -81,32 +99,106 @@
                 <HierarchicalDataTemplate ItemsSource="{Binding Children}">
                     <Grid>
                         <Grid.ColumnDefinitions>
-                            <ColumnDefinition Width="230"/>
-                            <ColumnDefinition Width="130"/>
+                            <ColumnDefinition Width="180"/>
+                            <ColumnDefinition Width="110"/>
+                            <ColumnDefinition Width="90"/>
+                            <ColumnDefinition Width="110"/>
+                            <ColumnDefinition Width="80"/>
+                            <ColumnDefinition Width="80"/>
+                            <ColumnDefinition Width="80"/>
+                            <ColumnDefinition Width="50"/>
+                            <ColumnDefinition Width="80"/>
+                            <ColumnDefinition Width="50"/>
                             <ColumnDefinition Width="*"/>
                         </Grid.ColumnDefinitions>
 
+                        <!-- Name -->
                         <TextBlock Grid.Column="0"
                                    Text="{Binding Name}"
                                    Foreground="{DynamicResource {x:Static adonisUi:Brushes.ForegroundBrush}}"
                                    Padding="0,1" TextTrimming="CharacterEllipsis"/>
 
+                        <!-- Type -->
                         <TextBlock Grid.Column="1"
                                    Text="{Binding TypeName}"
                                    Foreground="{DynamicResource {x:Static adonisUi:Brushes.DisabledForegroundBrush}}"
                                    Padding="4,1,0,1" TextTrimming="CharacterEllipsis"/>
 
-                        <TextBox   Grid.Column="2"
-                                   Text="{Binding Value, Mode=TwoWay, UpdateSourceTrigger=LostFocus}"
-                                   IsReadOnly="{Binding IsReadOnly}"
-                                   BorderThickness="0"
-                                   Background="Transparent"
-                                   Foreground="{DynamicResource {x:Static adonisUi:Brushes.ForegroundBrush}}"
-                                   CaretBrush="{DynamicResource {x:Static adonisUi:Brushes.ForegroundBrush}}"
-                                   Padding="4,1,0,1"
-                                   VerticalAlignment="Center"
-                                   PreviewMouseLeftButtonDown="PropValue_PreviewMouseDown"
-                                   GotKeyboardFocus="PropValue_GotFocus"/>
+                        <!-- Variant -->
+                        <TextBlock Grid.Column="2"
+                                   Text="{Binding Variant}"
+                                   Foreground="{DynamicResource {x:Static adonisUi:Brushes.DisabledForegroundBrush}}"
+                                   Padding="4,1,0,1" TextTrimming="CharacterEllipsis"/>
+
+                        <!-- Value 1 -->
+                        <TextBox Grid.Column="3"
+                                 Text="{Binding Value, Mode=TwoWay, UpdateSourceTrigger=LostFocus}"
+                                 IsReadOnly="{Binding IsReadOnly}"
+                                 BorderThickness="0"
+                                 Background="Transparent"
+                                 Foreground="{DynamicResource {x:Static adonisUi:Brushes.ForegroundBrush}}"
+                                 CaretBrush="{DynamicResource {x:Static adonisUi:Brushes.ForegroundBrush}}"
+                                 Padding="4,1,0,1"
+                                 VerticalAlignment="Center"
+                                 PreviewMouseLeftButtonDown="PropValue_PreviewMouseDown"
+                                 GotKeyboardFocus="PropValue_GotFocus"/>
+
+                        <!-- Value 2 -->
+                        <TextBox Grid.Column="4"
+                                 Text="{Binding V2, Mode=TwoWay, UpdateSourceTrigger=LostFocus}"
+                                 IsReadOnly="{Binding IsReadOnly2}"
+                                 BorderThickness="0"
+                                 Background="Transparent"
+                                 Foreground="{DynamicResource {x:Static adonisUi:Brushes.ForegroundBrush}}"
+                                 CaretBrush="{DynamicResource {x:Static adonisUi:Brushes.ForegroundBrush}}"
+                                 Padding="4,1,0,1"
+                                 VerticalAlignment="Center"
+                                 PreviewMouseLeftButtonDown="PropValue_PreviewMouseDown"
+                                 GotKeyboardFocus="PropValue_GotFocus"/>
+
+                        <!-- Value 3 -->
+                        <TextBox Grid.Column="5"
+                                 Text="{Binding V3, Mode=TwoWay, UpdateSourceTrigger=LostFocus}"
+                                 IsReadOnly="{Binding IsReadOnly3}"
+                                 BorderThickness="0"
+                                 Background="Transparent"
+                                 Foreground="{DynamicResource {x:Static adonisUi:Brushes.ForegroundBrush}}"
+                                 CaretBrush="{DynamicResource {x:Static adonisUi:Brushes.ForegroundBrush}}"
+                                 Padding="4,1,0,1"
+                                 VerticalAlignment="Center"
+                                 PreviewMouseLeftButtonDown="PropValue_PreviewMouseDown"
+                                 GotKeyboardFocus="PropValue_GotFocus"/>
+
+                        <!-- Value 4 -->
+                        <TextBox Grid.Column="6"
+                                 Text="{Binding V4, Mode=TwoWay, UpdateSourceTrigger=LostFocus}"
+                                 IsReadOnly="{Binding IsReadOnly4}"
+                                 BorderThickness="0"
+                                 Background="Transparent"
+                                 Foreground="{DynamicResource {x:Static adonisUi:Brushes.ForegroundBrush}}"
+                                 CaretBrush="{DynamicResource {x:Static adonisUi:Brushes.ForegroundBrush}}"
+                                 Padding="4,1,0,1"
+                                 VerticalAlignment="Center"
+                                 PreviewMouseLeftButtonDown="PropValue_PreviewMouseDown"
+                                 GotKeyboardFocus="PropValue_GotFocus"/>
+
+                        <!-- Array Index (read-only) -->
+                        <TextBlock Grid.Column="7"
+                                   Text="{Binding ArrayIndexDisplay}"
+                                   Foreground="{DynamicResource {x:Static adonisUi:Brushes.DisabledForegroundBrush}}"
+                                   Padding="4,1,0,1"/>
+
+                        <!-- Offset (read-only) -->
+                        <TextBlock Grid.Column="8"
+                                   Text="{Binding OffsetDisplay}"
+                                   Foreground="{DynamicResource {x:Static adonisUi:Brushes.DisabledForegroundBrush}}"
+                                   Padding="4,1,0,1" TextTrimming="CharacterEllipsis"/>
+
+                        <!-- Is Zero (read-only) -->
+                        <TextBlock Grid.Column="9"
+                                   Text="{Binding IsZero}"
+                                   Foreground="{DynamicResource {x:Static adonisUi:Brushes.DisabledForegroundBrush}}"
+                                   Padding="4,1,0,1"/>
                     </Grid>
                 </HierarchicalDataTemplate>
             </TreeView.ItemTemplate>

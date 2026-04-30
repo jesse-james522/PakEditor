@@ -3,6 +3,7 @@ using System.Collections.Generic;
 using System.Collections.ObjectModel;
 using System.Diagnostics;
 using System.IO;
+using System.Linq;
 using System.Text;
 using System.Windows.Controls;
 using System.Windows.Input;
@@ -17,6 +18,8 @@ using PakEditor.Editor;
 using PakEditor.Packer;
 using UAssetAPI;
 using UAssetAPI.ExportTypes;
+using UAssetAPI.PropertyTypes.Objects;
+using UAssetAPI.PropertyTypes.Structs;
 using UAssetAPI.Unversioned;
 using UAssetAPI.UnrealTypes;
 
@@ -28,9 +31,10 @@ public partial class AssetEditorWindow : AdonisUI.Controls.AdonisWindow
     private readonly AbstractVfsFileProvider _provider;
     private readonly bool                    _autoLaunchUAssetGui;
 
-    private UAsset? _asset;
-    private string? _editPath;
-    private bool    _isDirty;
+    private UAsset?  _asset;
+    private string?  _editPath;
+    private bool     _isDirty;
+    private Process? _externalProcess;
 
     // Persistent edit folder — files here survive across sessions and are never re-extracted if present.
     internal static readonly string EditRoot =
@@ -173,6 +177,8 @@ public partial class AssetEditorWindow : AdonisUI.Controls.AdonisWindow
     {
         if (_asset is null) return;
 
+        var expanded = SnapshotExpanded();
+
         var roots = new ObservableCollection<PropNode>();
 
         for (int i = 0; i < _asset.Exports.Count; i++)
@@ -198,11 +204,9 @@ public partial class AssetEditorWindow : AdonisUI.Controls.AdonisWindow
             {
                 try
                 {
-                    // NormalExport props (e.g. RowStruct reference)
                     foreach (var p in PropNodeBuilder.BuildExport(dte, _asset, OnPropChanged))
                         header.Children.Add(p);
 
-                    // DataTable rows
                     if (dte.Table?.Data is { Count: > 0 })
                         header.Children.Add(
                             PropNodeBuilder.BuildDataTableRows(dte.Table, _asset, OnPropChanged));
@@ -223,6 +227,37 @@ public partial class AssetEditorWindow : AdonisUI.Controls.AdonisWindow
         }
 
         PropTree.ItemsSource = roots;
+        RestoreExpanded(roots, string.Empty, expanded);
+    }
+
+    // ── Expansion preservation ────────────────────────────────────────────────
+
+    private HashSet<string> SnapshotExpanded()
+    {
+        var set = new HashSet<string>();
+        if (PropTree.ItemsSource is IEnumerable<PropNode> roots)
+            CollectExpanded(roots, string.Empty, set);
+        return set;
+    }
+
+    private static void CollectExpanded(IEnumerable<PropNode> nodes, string prefix, HashSet<string> set)
+    {
+        foreach (var n in nodes)
+        {
+            var path = prefix + "/" + n.Name;
+            if (n.IsExpanded) set.Add(path);
+            CollectExpanded(n.Children, path, set);
+        }
+    }
+
+    private static void RestoreExpanded(IEnumerable<PropNode> nodes, string prefix, HashSet<string> expanded)
+    {
+        foreach (var n in nodes)
+        {
+            var path = prefix + "/" + n.Name;
+            if (expanded.Contains(path)) n.IsExpanded = true;
+            RestoreExpanded(n.Children, path, expanded);
+        }
     }
 
     // ── Single-click editing ──────────────────────────────────────────────────
@@ -244,14 +279,156 @@ public partial class AssetEditorWindow : AdonisUI.Controls.AdonisWindow
             tb.SelectAll();
     }
 
+    // ── Context menu ─────────────────────────────────────────────────────────
+
+    private void PropTree_ContextMenuOpening(object sender, ContextMenuEventArgs e)
+    {
+        var node = PropTree.SelectedItem as PropNode;
+        if (node is null)
+        {
+            e.Handled = true;
+            return;
+        }
+
+        bool isArray   = node.SourcePD is ArrayPropertyData;
+        bool isElement = node.ParentArray is not null;
+
+        // "Add element": shown when the selected node is an array itself OR an element inside one
+        MenuAddElement.Visibility       = (isArray || isElement) ? Visibility.Visible : Visibility.Collapsed;
+        // "Remove element": shown only for elements inside an array
+        MenuRemoveElement.Visibility    = isElement              ? Visibility.Visible : Visibility.Collapsed;
+        // "Duplicate element": shown only for elements inside an array
+        MenuDuplicateElement.Visibility = isElement              ? Visibility.Visible : Visibility.Collapsed;
+
+        // If nothing is applicable, cancel the menu
+        if (!isArray && !isElement)
+            e.Handled = true;
+    }
+
+    // ── Array add / remove ────────────────────────────────────────────────────
+
+    private void AddArrayElement_Click(object sender, RoutedEventArgs e)
+    {
+        if (_asset is null) return;
+        var node = PropTree.SelectedItem as PropNode;
+        if (node is null) return;
+
+        ArrayPropertyData? apd = null;
+
+        if (node.SourcePD is ArrayPropertyData directApd)
+        {
+            // Selected node is the array itself — append to end
+            apd = directApd;
+        }
+        else if (node.ParentArray is not null)
+        {
+            // Selected node is an element — append after this element's index
+            apd = node.ParentArray;
+        }
+
+        if (apd is null) return;
+        if (apd.ArrayType is null) return;
+
+        var newElem = CreateDefaultElement(apd.ArrayType, _asset);
+        if (newElem is null)
+        {
+            SetStatus($"Cannot create default element for type '{apd.ArrayType}'.");
+            return;
+        }
+
+        apd.Value = apd.Value.Concat(new[] { newElem }).ToArray();
+        OnPropChanged();
+        BuildTree();
+    }
+
+    private void RemoveArrayElement_Click(object sender, RoutedEventArgs e)
+    {
+        if (_asset is null) return;
+        var node = PropTree.SelectedItem as PropNode;
+        if (node?.ParentArray is null || node.SourcePD is null) return;
+
+        var apd = node.ParentArray;
+        var pd  = node.SourcePD;
+
+        apd.Value = apd.Value.Where(x => !ReferenceEquals(x, pd)).ToArray();
+        OnPropChanged();
+        BuildTree();
+    }
+
+    private void DuplicateArrayElement_Click(object sender, RoutedEventArgs e)
+    {
+        if (_asset is null) return;
+        var node = PropTree.SelectedItem as PropNode;
+        if (node?.ParentArray is null || node.SourcePD is null) return;
+
+        var apd = node.ParentArray;
+        var pd  = node.SourcePD;
+
+        // Find the index of the source element and insert a clone right after it
+        var list = apd.Value.ToList();
+        var idx  = list.FindIndex(x => ReferenceEquals(x, pd));
+        if (idx < 0) return;
+
+        // Clone by round-tripping through JSON serialization isn't available without full context,
+        // so fall back to creating a default element of the same type as a "duplicate".
+        if (apd.ArrayType is null) return;
+        var newElem = CreateDefaultElement(apd.ArrayType, _asset);
+        if (newElem is null)
+        {
+            SetStatus($"Cannot duplicate element of type '{apd.ArrayType}'.");
+            return;
+        }
+
+        list.Insert(idx + 1, newElem);
+        apd.Value = list.ToArray();
+        OnPropChanged();
+        BuildTree();
+    }
+
+    // ── Default element factory ───────────────────────────────────────────────
+
+    private static PropertyData? CreateDefaultElement(FName arrayType, UAsset asset)
+    {
+        var dummyName = FName.DefineDummy(asset, "None");
+        return arrayType.Value.Value switch
+        {
+            "BoolProperty"   => new BoolPropertyData(dummyName)   { Value = false },
+            "IntProperty"    => new IntPropertyData(dummyName)    { Value = 0 },
+            "Int8Property"   => new Int8PropertyData(dummyName)   { Value = 0 },
+            "Int16Property"  => new Int16PropertyData(dummyName)  { Value = 0 },
+            "Int64Property"  => new Int64PropertyData(dummyName)  { Value = 0L },
+            "UInt16Property" => new UInt16PropertyData(dummyName) { Value = 0 },
+            "UInt32Property" => new UInt32PropertyData(dummyName) { Value = 0u },
+            "UInt64Property" => new UInt64PropertyData(dummyName) { Value = 0ul },
+            "FloatProperty"  => new FloatPropertyData(dummyName)  { Value = 0f },
+            "DoubleProperty" => new DoublePropertyData(dummyName) { Value = 0.0 },
+            "StrProperty"    => new StrPropertyData(dummyName)    { Value = new FString(string.Empty) },
+            "NameProperty"   => new NamePropertyData(dummyName)   { Value = FName.DefineDummy(asset, "None") },
+            "ObjectProperty" => new ObjectPropertyData(dummyName) { Value = new FPackageIndex(0) },
+            "StructProperty" => new StructPropertyData(dummyName) { Value = new List<PropertyData>() },
+            _ => null,
+        };
+    }
+
     // ── Dirty tracking ────────────────────────────────────────────────────────
 
     private void OnPropChanged()
     {
-        if (_isDirty) return;
         _isDirty = true;
-        BtnSave.IsEnabled = true;
-        SetStatus("Unsaved changes.");
+        UpdateEditLock();
+        if (BtnSave.IsEnabled)
+            SetStatus("Unsaved changes.");
+    }
+
+    // ── External-process lock ─────────────────────────────────────────────────
+
+    private bool IsExternalLocked => _externalProcess is { HasExited: false };
+
+    private void UpdateEditLock()
+    {
+        var locked = IsExternalLocked;
+        BtnSave.IsEnabled = _isDirty && !locked;
+        BtnSave.ToolTip   = locked ? "Close Branch View before saving here." : null;
     }
 
     // ── Save ──────────────────────────────────────────────────────────────────
@@ -259,16 +436,27 @@ public partial class AssetEditorWindow : AdonisUI.Controls.AdonisWindow
     private void BtnSave_Click(object sender, RoutedEventArgs e)
     {
         if (_asset is null || _editPath is null) return;
+        if (IsExternalLocked)
+        {
+            SetStatus("Close Branch View first — saving now would overwrite its changes.");
+            return;
+        }
+        var tmp = _editPath + ".tmp";
         try
         {
-            _asset.Write(_editPath);
+            _asset.Write(tmp);
+            File.Move(tmp, _editPath, overwrite: true);
             _isDirty          = false;
             BtnSave.IsEnabled = false;
             SetStatus($"Saved → {_editPath}");
         }
         catch (Exception ex)
         {
-            SetStatus($"Save failed: {ex.Message}");
+            SetStatus($"Save failed ({ex.GetType().Name}): {ex.Message}");
+        }
+        finally
+        {
+            try { if (File.Exists(tmp)) File.Delete(tmp); } catch { }
         }
     }
 
@@ -327,10 +515,25 @@ public partial class AssetEditorWindow : AdonisUI.Controls.AdonisWindow
 
         try
         {
-            Process.Start(new ProcessStartInfo(UAssetGuiExe, $"\"{_editPath}\" {verArg}")
+            _externalProcess?.Dispose();
+            _externalProcess = Process.Start(new ProcessStartInfo(UAssetGuiExe, $"\"{_editPath}\" {verArg}")
             {
                 UseShellExecute = false,
             });
+
+            if (_externalProcess != null)
+            {
+                _externalProcess.EnableRaisingEvents = true;
+                _externalProcess.Exited += (_, _) => Dispatcher.Invoke(() =>
+                {
+                    _externalProcess = null;
+                    _isDirty         = false; // external tool may have rewritten the file
+                    UpdateEditLock();
+                    SetStatus("Branch View closed. Reopen the editor to pick up external changes.");
+                });
+            }
+
+            UpdateEditLock();
             SetStatus($"Opened in Branch View → {_editPath}");
         }
         catch (Exception ex)
@@ -473,15 +676,18 @@ public partial class AssetEditorWindow : AdonisUI.Controls.AdonisWindow
         var jsonPath = editPath + ".json";
         if (!File.Exists(jsonPath)) return (true, null);
 
+        var tmp = editPath + ".tmp";
         try
         {
             var json  = File.ReadAllText(jsonPath);
             var patch = UAsset.DeserializeJson(json);
-            patch.Write(editPath);
+            patch.Write(tmp);
+            File.Move(tmp, editPath, overwrite: true);
             return (true, null);
         }
         catch (Exception ex)
         {
+            try { if (File.Exists(tmp)) File.Delete(tmp); } catch { }
             return (false, ex.Message);
         }
     }

@@ -50,6 +50,7 @@ public static class PropNodeBuilder
                             TypeName = p.PropertyType.Value,
                             IsLeaf   = true,
                             Value    = $"[ERROR] {ex.Message}",
+                            SourcePD = p,
                         });
                     }
                 }
@@ -80,6 +81,7 @@ public static class PropNodeBuilder
                     TypeName = pd.PropertyType.Value,
                     IsLeaf   = true,
                     Value    = $"[ERROR] {ex.Message}",
+                    SourcePD = pd,
                 });
             }
         }
@@ -96,32 +98,44 @@ public static class PropNodeBuilder
         {
             "StructProperty" or "ClothLODData"
                 => MakeStruct((StructPropertyData)pd, name, asset),
-            "ArrayProperty"  or "SetProperty"
+            "ArrayProperty" or "SetProperty"
                 => MakeArray((ArrayPropertyData)pd, name, asset),
             "MapProperty"
                 => MakeMap((MapPropertyData)pd, name),
             "Vector"
-                => MakeVec3((VectorPropertyData)pd, name),
+                => MakeVectorLeaf((VectorPropertyData)pd, name),
             "Vector2D"
-                => MakeVec2((Vector2DPropertyData)pd, name),
+                => MakeVector2DLeaf((Vector2DPropertyData)pd, name),
             "Vector4"
-                => MakeVec4((Vector4PropertyData)pd, name),
+                => MakeVector4Leaf((Vector4PropertyData)pd, name),
             "Rotator"
-                => MakeRotator((RotatorPropertyData)pd, name),
+                => MakeRotatorLeaf((RotatorPropertyData)pd, name),
             "Quat"
-                => MakeQuat((QuatPropertyData)pd, name),
+                => MakeQuatLeaf((QuatPropertyData)pd, name),
             "LinearColor"
-                => MakeLinearColor((LinearColorPropertyData)pd, name),
+                => MakeLinearColorLeaf((LinearColorPropertyData)pd, name),
             "Color"
-                => MakeColor((ColorPropertyData)pd, name),
+                => MakeColorLeaf((ColorPropertyData)pd, name),
             _
                 => MakeLeaf(pd, name, asset),
         };
     }
 
+    // ── Container types ───────────────────────────────────────────────────────
+
     private static PropNode MakeStruct(StructPropertyData spd, string name, UAsset asset)
     {
-        var n = Container(name, spd.StructType?.ToString() ?? "Struct");
+        var n = new PropNode
+        {
+            Name       = name,
+            TypeName   = "StructProperty",
+            Variant    = spd.StructType?.ToString() ?? string.Empty,
+            IsLeaf     = false,
+            SourcePD   = spd,
+            ArrayIndex = spd.ArrayIndex,
+            Offset     = spd.Offset,
+            IsZero     = spd.IsZero,
+        };
         foreach (var p in spd.Value)
             if (p is not null) n.Children.Add(Make(p, asset));
         return n;
@@ -129,140 +143,252 @@ public static class PropNodeBuilder
 
     private static PropNode MakeArray(ArrayPropertyData apd, string name, UAsset asset)
     {
-        var n = Container(name, $"Array[{apd.Value.Length}]");
+        var n = new PropNode
+        {
+            Name       = name,
+            TypeName   = "ArrayProperty",
+            Variant    = apd.ArrayType?.ToString() ?? string.Empty,
+            IsLeaf     = false,
+            SourcePD   = apd,
+            ArrayIndex = apd.ArrayIndex,
+            Offset     = apd.Offset,
+            IsZero     = apd.IsZero,
+        };
         for (int i = 0; i < apd.Value.Length; i++)
-            if (apd.Value[i] is not null) n.Children.Add(Make(apd.Value[i], asset, i));
+        {
+            if (apd.Value[i] is null) continue;
+            var child = Make(apd.Value[i], asset, i);
+            child.ParentArray = apd;
+            n.Children.Add(child);
+        }
         return n;
     }
 
     private static PropNode MakeMap(MapPropertyData mpd, string name)
-        => new() { Name = name, TypeName = $"Map{{{mpd.Value.Keys.Count}}}", IsLeaf = true,
-                   Value = $"{mpd.Value.Keys.Count} entries" };
+        => new()
+        {
+            Name       = name,
+            TypeName   = "MapProperty",
+            Variant    = "Map",
+            IsLeaf     = true,
+            Value      = $"{mpd.Value.Keys.Count} entries",
+            SourcePD   = mpd,
+            ArrayIndex = mpd.ArrayIndex,
+            Offset     = mpd.Offset,
+            IsZero     = mpd.IsZero,
+        };
 
-    private static PropNode MakeVec3(VectorPropertyData v, string name)
-    {
-        var n = Container(name, "Vector");
-        n.Children.Add(F64("X", () => v.Value.X, x => v.Value = new FVector(x, v.Value.Y, v.Value.Z)));
-        n.Children.Add(F64("Y", () => v.Value.Y, y => v.Value = new FVector(v.Value.X, y, v.Value.Z)));
-        n.Children.Add(F64("Z", () => v.Value.Z, z => v.Value = new FVector(v.Value.X, v.Value.Y, z)));
-        return n;
-    }
+    // ── Multi-value leaf types (inline V1-V4, no child nodes) ─────────────────
 
-    private static PropNode MakeVec2(Vector2DPropertyData v, string name)
-    {
-        var n = Container(name, "Vector2D");
-        n.Children.Add(F64("X", () => v.Value.X, x => v.Value = new FVector2D(x, v.Value.Y)));
-        n.Children.Add(F64("Y", () => v.Value.Y, y => v.Value = new FVector2D(v.Value.X, y)));
-        return n;
-    }
+    private static string G(double v)  => v.ToString("G", CultureInfo.InvariantCulture);
+    private static string Gf(float v)  => v.ToString("G", CultureInfo.InvariantCulture);
 
-    private static PropNode MakeVec4(Vector4PropertyData v, string name)
-    {
-        var n = Container(name, "Vector4");
-        n.Children.Add(F64("X", () => v.Value.X, x => v.Value = new FVector4(x, v.Value.Y, v.Value.Z, v.Value.W)));
-        n.Children.Add(F64("Y", () => v.Value.Y, y => v.Value = new FVector4(v.Value.X, y, v.Value.Z, v.Value.W)));
-        n.Children.Add(F64("Z", () => v.Value.Z, z => v.Value = new FVector4(v.Value.X, v.Value.Y, z, v.Value.W)));
-        n.Children.Add(F64("W", () => v.Value.W, w => v.Value = new FVector4(v.Value.X, v.Value.Y, v.Value.Z, w)));
-        return n;
-    }
+    private static PropNode MakeVectorLeaf(VectorPropertyData v, string name)
+        => new()
+        {
+            Name       = name,
+            TypeName   = "Vector",
+            Variant    = string.Empty,
+            IsLeaf     = true,
+            Value      = G(v.Value.X),
+            V2         = G(v.Value.Y),
+            V3         = G(v.Value.Z),
+            WriteFn    = s => v.Value = new FVector(double.Parse(s, CultureInfo.InvariantCulture), v.Value.Y, v.Value.Z),
+            WriteFn2   = s => v.Value = new FVector(v.Value.X, double.Parse(s, CultureInfo.InvariantCulture), v.Value.Z),
+            WriteFn3   = s => v.Value = new FVector(v.Value.X, v.Value.Y, double.Parse(s, CultureInfo.InvariantCulture)),
+            SourcePD   = v,
+            ArrayIndex = v.ArrayIndex,
+            Offset     = v.Offset,
+            IsZero     = v.IsZero,
+        };
 
-    private static PropNode MakeRotator(RotatorPropertyData r, string name)
-    {
-        var n = Container(name, "Rotator");
-        n.Children.Add(F64("Pitch", () => r.Value.Pitch, v => r.Value = new FRotator(v, r.Value.Yaw,   r.Value.Roll)));
-        n.Children.Add(F64("Yaw",   () => r.Value.Yaw,   v => r.Value = new FRotator(r.Value.Pitch, v, r.Value.Roll)));
-        n.Children.Add(F64("Roll",  () => r.Value.Roll,  v => r.Value = new FRotator(r.Value.Pitch, r.Value.Yaw, v)));
-        return n;
-    }
+    private static PropNode MakeVector2DLeaf(Vector2DPropertyData v, string name)
+        => new()
+        {
+            Name       = name,
+            TypeName   = "Vector2D",
+            Variant    = string.Empty,
+            IsLeaf     = true,
+            Value      = G(v.Value.X),
+            V2         = G(v.Value.Y),
+            WriteFn    = s => v.Value = new FVector2D(double.Parse(s, CultureInfo.InvariantCulture), v.Value.Y),
+            WriteFn2   = s => v.Value = new FVector2D(v.Value.X, double.Parse(s, CultureInfo.InvariantCulture)),
+            SourcePD   = v,
+            ArrayIndex = v.ArrayIndex,
+            Offset     = v.Offset,
+            IsZero     = v.IsZero,
+        };
 
-    private static PropNode MakeQuat(QuatPropertyData q, string name)
-    {
-        var n = Container(name, "Quat");
-        n.Children.Add(F64("X", () => q.Value.X, v => q.Value = new FQuat(v, q.Value.Y, q.Value.Z, q.Value.W)));
-        n.Children.Add(F64("Y", () => q.Value.Y, v => q.Value = new FQuat(q.Value.X, v, q.Value.Z, q.Value.W)));
-        n.Children.Add(F64("Z", () => q.Value.Z, v => q.Value = new FQuat(q.Value.X, q.Value.Y, v, q.Value.W)));
-        n.Children.Add(F64("W", () => q.Value.W, v => q.Value = new FQuat(q.Value.X, q.Value.Y, q.Value.Z, v)));
-        return n;
-    }
+    private static PropNode MakeVector4Leaf(Vector4PropertyData v, string name)
+        => new()
+        {
+            Name       = name,
+            TypeName   = "Vector4",
+            Variant    = string.Empty,
+            IsLeaf     = true,
+            Value      = G(v.Value.X),
+            V2         = G(v.Value.Y),
+            V3         = G(v.Value.Z),
+            V4         = G(v.Value.W),
+            WriteFn    = s => v.Value = new FVector4(double.Parse(s, CultureInfo.InvariantCulture), v.Value.Y, v.Value.Z, v.Value.W),
+            WriteFn2   = s => v.Value = new FVector4(v.Value.X, double.Parse(s, CultureInfo.InvariantCulture), v.Value.Z, v.Value.W),
+            WriteFn3   = s => v.Value = new FVector4(v.Value.X, v.Value.Y, double.Parse(s, CultureInfo.InvariantCulture), v.Value.W),
+            WriteFn4   = s => v.Value = new FVector4(v.Value.X, v.Value.Y, v.Value.Z, double.Parse(s, CultureInfo.InvariantCulture)),
+            SourcePD   = v,
+            ArrayIndex = v.ArrayIndex,
+            Offset     = v.Offset,
+            IsZero     = v.IsZero,
+        };
 
-    private static PropNode MakeLinearColor(LinearColorPropertyData lc, string name)
-    {
-        var n = Container(name, "LinearColor");
-        n.Children.Add(F32("R", () => lc.Value.R, v => lc.Value = new FLinearColor(v, lc.Value.G, lc.Value.B, lc.Value.A)));
-        n.Children.Add(F32("G", () => lc.Value.G, v => lc.Value = new FLinearColor(lc.Value.R, v, lc.Value.B, lc.Value.A)));
-        n.Children.Add(F32("B", () => lc.Value.B, v => lc.Value = new FLinearColor(lc.Value.R, lc.Value.G, v, lc.Value.A)));
-        n.Children.Add(F32("A", () => lc.Value.A, v => lc.Value = new FLinearColor(lc.Value.R, lc.Value.G, lc.Value.B, v)));
-        return n;
-    }
+    private static PropNode MakeRotatorLeaf(RotatorPropertyData r, string name)
+        => new()
+        {
+            Name       = name,
+            TypeName   = "Rotator",
+            Variant    = string.Empty,
+            IsLeaf     = true,
+            // UAssetGUI order: Roll, Pitch, Yaw
+            Value      = G(r.Value.Roll),
+            V2         = G(r.Value.Pitch),
+            V3         = G(r.Value.Yaw),
+            WriteFn    = s => r.Value = new FRotator(r.Value.Pitch, r.Value.Yaw, double.Parse(s, CultureInfo.InvariantCulture)),
+            WriteFn2   = s => r.Value = new FRotator(double.Parse(s, CultureInfo.InvariantCulture), r.Value.Yaw, r.Value.Roll),
+            WriteFn3   = s => r.Value = new FRotator(r.Value.Pitch, double.Parse(s, CultureInfo.InvariantCulture), r.Value.Roll),
+            SourcePD   = r,
+            ArrayIndex = r.ArrayIndex,
+            Offset     = r.Offset,
+            IsZero     = r.IsZero,
+        };
 
-    private static PropNode MakeColor(ColorPropertyData c, string name)
-    {
-        var n = Container(name, "Color");
-        n.Children.Add(Byte("R", () => c.Value.R, v => c.Value = System.Drawing.Color.FromArgb(c.Value.A, v, c.Value.G, c.Value.B)));
-        n.Children.Add(Byte("G", () => c.Value.G, v => c.Value = System.Drawing.Color.FromArgb(c.Value.A, c.Value.R, v, c.Value.B)));
-        n.Children.Add(Byte("B", () => c.Value.B, v => c.Value = System.Drawing.Color.FromArgb(c.Value.A, c.Value.R, c.Value.G, v)));
-        n.Children.Add(Byte("A", () => c.Value.A, v => c.Value = System.Drawing.Color.FromArgb(v, c.Value.R, c.Value.G, c.Value.B)));
-        return n;
-    }
+    private static PropNode MakeQuatLeaf(QuatPropertyData q, string name)
+        => new()
+        {
+            Name       = name,
+            TypeName   = "Quat",
+            Variant    = string.Empty,
+            IsLeaf     = true,
+            Value      = G(q.Value.X),
+            V2         = G(q.Value.Y),
+            V3         = G(q.Value.Z),
+            V4         = G(q.Value.W),
+            WriteFn    = s => q.Value = new FQuat(double.Parse(s, CultureInfo.InvariantCulture), q.Value.Y, q.Value.Z, q.Value.W),
+            WriteFn2   = s => q.Value = new FQuat(q.Value.X, double.Parse(s, CultureInfo.InvariantCulture), q.Value.Z, q.Value.W),
+            WriteFn3   = s => q.Value = new FQuat(q.Value.X, q.Value.Y, double.Parse(s, CultureInfo.InvariantCulture), q.Value.W),
+            WriteFn4   = s => q.Value = new FQuat(q.Value.X, q.Value.Y, q.Value.Z, double.Parse(s, CultureInfo.InvariantCulture)),
+            SourcePD   = q,
+            ArrayIndex = q.ArrayIndex,
+            Offset     = q.Offset,
+            IsZero     = q.IsZero,
+        };
+
+    private static PropNode MakeLinearColorLeaf(LinearColorPropertyData lc, string name)
+        => new()
+        {
+            Name       = name,
+            TypeName   = "LinearColor",
+            Variant    = string.Empty,
+            IsLeaf     = true,
+            Value      = Gf(lc.Value.R),
+            V2         = Gf(lc.Value.G),
+            V3         = Gf(lc.Value.B),
+            V4         = Gf(lc.Value.A),
+            WriteFn    = s => lc.Value = new FLinearColor(float.Parse(s, CultureInfo.InvariantCulture), lc.Value.G, lc.Value.B, lc.Value.A),
+            WriteFn2   = s => lc.Value = new FLinearColor(lc.Value.R, float.Parse(s, CultureInfo.InvariantCulture), lc.Value.B, lc.Value.A),
+            WriteFn3   = s => lc.Value = new FLinearColor(lc.Value.R, lc.Value.G, float.Parse(s, CultureInfo.InvariantCulture), lc.Value.A),
+            WriteFn4   = s => lc.Value = new FLinearColor(lc.Value.R, lc.Value.G, lc.Value.B, float.Parse(s, CultureInfo.InvariantCulture)),
+            SourcePD   = lc,
+            ArrayIndex = lc.ArrayIndex,
+            Offset     = lc.Offset,
+            IsZero     = lc.IsZero,
+        };
+
+    private static PropNode MakeColorLeaf(ColorPropertyData c, string name)
+        => new()
+        {
+            Name       = name,
+            TypeName   = "Color",
+            Variant    = string.Empty,
+            IsLeaf     = true,
+            Value      = c.Value.R.ToString(),
+            V2         = c.Value.G.ToString(),
+            V3         = c.Value.B.ToString(),
+            V4         = c.Value.A.ToString(),
+            WriteFn    = s => c.Value = System.Drawing.Color.FromArgb(c.Value.A, byte.Parse(s), c.Value.G, c.Value.B),
+            WriteFn2   = s => c.Value = System.Drawing.Color.FromArgb(c.Value.A, c.Value.R, byte.Parse(s), c.Value.B),
+            WriteFn3   = s => c.Value = System.Drawing.Color.FromArgb(c.Value.A, c.Value.R, c.Value.G, byte.Parse(s)),
+            WriteFn4   = s => c.Value = System.Drawing.Color.FromArgb(byte.Parse(s), c.Value.R, c.Value.G, c.Value.B),
+            SourcePD   = c,
+            ArrayIndex = c.ArrayIndex,
+            Offset     = c.Offset,
+            IsZero     = c.IsZero,
+        };
+
+    // ── Scalar leaf types ──────────────────────────────────────────────────────
 
     private static PropNode MakeLeaf(PropertyData pd, string name, UAsset asset)
     {
-        var (value, writeFn) = GetValueWriter(pd, asset);
+        var (value, writeFn, variant) = GetValueWriter(pd, asset);
         return new PropNode
         {
-            Name     = name,
-            TypeName = pd.PropertyType.Value,
-            IsLeaf   = true,
-            Value    = value,
-            WriteFn  = writeFn,
+            Name       = name,
+            TypeName   = pd.PropertyType.Value,
+            Variant    = variant,
+            IsLeaf     = true,
+            Value      = value,
+            WriteFn    = writeFn,
+            SourcePD   = pd,
+            ArrayIndex = pd.ArrayIndex,
+            Offset     = pd.Offset,
+            IsZero     = pd.IsZero,
         };
     }
 
-    // ── Value/writer extraction ───────────────────────────────────────────────
+    // ── Value/writer extraction ────────────────────────────────────────────────
 
-    private static (string value, Action<string>? write) GetValueWriter(PropertyData pd, UAsset asset)
+    private static (string value, Action<string>? write, string variant) GetValueWriter(PropertyData pd, UAsset asset)
     {
-        static string G(double v)  => v.ToString("G", CultureInfo.InvariantCulture);
-        static string Gf(float  v) => v.ToString("G", CultureInfo.InvariantCulture);
+        static string Gdbl(double v) => v.ToString("G", CultureInfo.InvariantCulture);
+        static string Gflt(float  v) => v.ToString("G", CultureInfo.InvariantCulture);
 
         switch (pd.PropertyType.Value)
         {
             case "BoolProperty":
             {
                 var p = (BoolPropertyData)pd;
-                return (p.Value.ToString().ToLowerInvariant(), s => p.Value = bool.Parse(s));
+                return (p.Value.ToString().ToLowerInvariant(), s => p.Value = bool.Parse(s), string.Empty);
             }
-            case "IntProperty":    { var p = (IntPropertyData)pd;    return (p.Value.ToString(), s => p.Value = int.Parse(s)); }
-            case "Int8Property":   { var p = (Int8PropertyData)pd;   return (p.Value.ToString(), s => p.Value = sbyte.Parse(s)); }
-            case "Int16Property":  { var p = (Int16PropertyData)pd;  return (p.Value.ToString(), s => p.Value = short.Parse(s)); }
-            case "Int64Property":  { var p = (Int64PropertyData)pd;  return (p.Value.ToString(), s => p.Value = long.Parse(s)); }
-            case "UInt16Property": { var p = (UInt16PropertyData)pd; return (p.Value.ToString(), s => p.Value = ushort.Parse(s)); }
-            case "UInt32Property": { var p = (UInt32PropertyData)pd; return (p.Value.ToString(), s => p.Value = uint.Parse(s)); }
-            case "UInt64Property": { var p = (UInt64PropertyData)pd; return (p.Value.ToString(), s => p.Value = ulong.Parse(s)); }
+            case "IntProperty":    { var p = (IntPropertyData)pd;    return (p.Value.ToString(), s => p.Value = int.Parse(s),    string.Empty); }
+            case "Int8Property":   { var p = (Int8PropertyData)pd;   return (p.Value.ToString(), s => p.Value = sbyte.Parse(s),  string.Empty); }
+            case "Int16Property":  { var p = (Int16PropertyData)pd;  return (p.Value.ToString(), s => p.Value = short.Parse(s),  string.Empty); }
+            case "Int64Property":  { var p = (Int64PropertyData)pd;  return (p.Value.ToString(), s => p.Value = long.Parse(s),   string.Empty); }
+            case "UInt16Property": { var p = (UInt16PropertyData)pd; return (p.Value.ToString(), s => p.Value = ushort.Parse(s), string.Empty); }
+            case "UInt32Property": { var p = (UInt32PropertyData)pd; return (p.Value.ToString(), s => p.Value = uint.Parse(s),   string.Empty); }
+            case "UInt64Property": { var p = (UInt64PropertyData)pd; return (p.Value.ToString(), s => p.Value = ulong.Parse(s),  string.Empty); }
             case "FloatProperty":
             {
                 var p = (FloatPropertyData)pd;
-                return (Gf(p.Value), s => p.Value = float.Parse(s, CultureInfo.InvariantCulture));
+                return (Gflt(p.Value), s => p.Value = float.Parse(s, CultureInfo.InvariantCulture), string.Empty);
             }
             case "DoubleProperty":
             {
                 var p = (DoublePropertyData)pd;
-                return (G(p.Value), s => p.Value = double.Parse(s, CultureInfo.InvariantCulture));
+                return (Gdbl(p.Value), s => p.Value = double.Parse(s, CultureInfo.InvariantCulture), string.Empty);
             }
             case "StrProperty":
             {
                 var p = (StrPropertyData)pd;
-                return (p.Value?.ToString() ?? string.Empty, s => p.Value = new FString(s));
+                var variant = p.Value?.Encoding?.HeaderName ?? string.Empty;
+                return (p.Value?.ToString() ?? string.Empty, s => p.Value = new FString(s), variant);
             }
             case "NameProperty":
             {
                 var p = (NamePropertyData)pd;
-                return (p.Value?.ToString() ?? string.Empty, s => p.Value = FName.FromString(asset, s));
+                return (p.Value?.ToString() ?? string.Empty, s => p.Value = FName.FromString(asset, s), string.Empty);
             }
             case "TextProperty":
             {
                 var p = (TextPropertyData)pd;
-                // CultureInvariantString is the source/display text; Value is the string-table key for Base history.
+                var variant = p.HistoryType.ToString();
                 var display = p.CultureInvariantString?.ToString() ?? p.Value?.ToString() ?? string.Empty;
                 return (display, s =>
                 {
@@ -270,19 +396,21 @@ public static class PropNodeBuilder
                         p.CultureInvariantString = new FString(s);
                     else
                         p.Value = new FString(s);
-                });
+                }, variant);
             }
             case "EnumProperty":
             {
                 var p = (EnumPropertyData)pd;
-                return (p.Value?.ToString() ?? string.Empty, s => p.Value = FName.FromString(asset, s));
+                var variant = p.EnumType?.ToString() ?? string.Empty;
+                return (p.Value?.ToString() ?? string.Empty, s => p.Value = FName.FromString(asset, s), variant);
             }
             case "ByteProperty":
             {
                 var p = (BytePropertyData)pd;
+                var variant = p.GetEnumBase()?.Value.Value ?? string.Empty;
                 if (p.ByteType == BytePropertyType.Byte)
-                    return (p.Value.ToString(), s => p.Value = byte.Parse(s));
-                return (p.GetEnumFull()?.ToString() ?? string.Empty, s => p.EnumValue = FName.FromString(asset, s));
+                    return (p.Value.ToString(), s => p.Value = byte.Parse(s), variant);
+                return (p.GetEnumFull()?.ToString() ?? string.Empty, s => p.EnumValue = FName.FromString(asset, s), variant);
             }
             case "ObjectProperty":
             case "WeakObjectProperty":
@@ -291,11 +419,11 @@ public static class PropNodeBuilder
                 var p   = (ObjectPropertyData)pd;
                 var idx = p.Value?.Index ?? 0;
                 string display;
-                if (idx == 0)                         display = "0 (null)";
-                else if (idx > 0  && idx - 1   < asset.Exports.Count) display = $"{idx} ({asset.Exports[idx - 1].ObjectName})";
-                else if (idx < 0  && -idx - 1  < asset.Imports.Count) display = $"{idx} ({asset.Imports[-idx - 1].ObjectName})";
-                else                                  display = idx.ToString();
-                return (display, s => p.Value = new FPackageIndex(int.Parse(s.Split(' ')[0].Trim())));
+                if (idx == 0)                        display = "0 (null)";
+                else if (idx > 0 && idx - 1  < asset.Exports.Count) display = $"{idx} ({asset.Exports[idx - 1].ObjectName})";
+                else if (idx < 0 && -idx - 1 < asset.Imports.Count) display = $"{idx} ({asset.Imports[-idx - 1].ObjectName})";
+                else                                 display = idx.ToString();
+                return (display, s => p.Value = new FPackageIndex(int.Parse(s.Split(' ')[0].Trim())), string.Empty);
             }
             case "SoftObjectProperty":
             {
@@ -318,37 +446,17 @@ public static class PropNodeBuilder
                         assetFn = p.Value.AssetPath.AssetName;
                     }
                     p.Value = new FSoftObjectPath(pkgFn, assetFn, p.Value.SubPathString);
-                });
+                }, string.Empty);
             }
             case "RichCurveKey":
             {
                 var p = (RichCurveKeyPropertyData)pd;
-                return ($"t={G(p.Value.Time)}  v={G(p.Value.Value)}", null);
+                return ($"t={Gdbl(p.Value.Time)}  v={Gdbl(p.Value.Value)}", null, string.Empty);
             }
             default:
                 if (pd is UnknownPropertyData unk)
-                    return (BitConverter.ToString(unk.Value).Replace("-", " "), null);
-                return (pd.RawValue?.ToString() ?? string.Empty, null);
+                    return (BitConverter.ToString(unk.Value).Replace("-", " "), null, string.Empty);
+                return (pd.RawValue?.ToString() ?? string.Empty, null, string.Empty);
         }
     }
-
-    // ── Helpers ───────────────────────────────────────────────────────────────
-
-    private static PropNode Container(string name, string typeName)
-        => new() { Name = name, TypeName = typeName, IsLeaf = false };
-
-    private static PropNode F64(string name, Func<double> get, Action<double> set)
-        => new() { Name = name, TypeName = "float64", IsLeaf = true,
-                   Value = get().ToString("G", CultureInfo.InvariantCulture),
-                   WriteFn = s => set(double.Parse(s, CultureInfo.InvariantCulture)) };
-
-    private static PropNode F32(string name, Func<float> get, Action<float> set)
-        => new() { Name = name, TypeName = "float32", IsLeaf = true,
-                   Value = get().ToString("G", CultureInfo.InvariantCulture),
-                   WriteFn = s => set(float.Parse(s, CultureInfo.InvariantCulture)) };
-
-    private static PropNode Byte(string name, Func<byte> get, Action<byte> set)
-        => new() { Name = name, TypeName = "byte", IsLeaf = true,
-                   Value = get().ToString(),
-                   WriteFn = s => set(byte.Parse(s)) };
 }
